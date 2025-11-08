@@ -33,31 +33,26 @@ const FollowUpsTile = () => {
   };
 
   return (
-    <div className="glass-tile gradient-followups p-6 hover-scale h-full overflow-auto custom-scrollbar">
-      <h2 className="text-xl font-semibold mb-4">Follow-ups</h2>
+    <div className="glass-tile gradient-followups p-4 hover-scale h-full flex flex-col">
+      <h2 className="text-lg font-semibold mb-3">Follow-ups</h2>
       
-      <div className="space-y-3">
-        {followUps.map((followUp) => (
+      <div className="space-y-2 overflow-auto custom-scrollbar flex-1">
+        {followUps.slice(0, 4).map((followUp) => (
           <Card
             key={followUp.id}
-            className={`p-4 bg-white/60 border-white/40 hover:bg-white/80 transition-all ${getUrgencyStyles(followUp.urgency)}`}
+            className={`p-3 bg-white/60 border-white/40 hover:bg-white/80 transition-all ${getUrgencyStyles(followUp.urgency)}`}
           >
-            <div className="flex justify-between items-start mb-2">
-              <h3 className="font-semibold">{followUp.name}</h3>
+            <div className="flex justify-between items-start mb-1">
+              <h3 className="font-semibold text-sm">{followUp.name}</h3>
               {followUp.urgency === "high" && (
-                <AlertCircle className="h-4 w-4 text-destructive" />
+                <AlertCircle className="h-3 w-3 text-destructive" />
               )}
             </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-              <Clock className="h-4 w-4" />
+            <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1.5">
+              <Clock className="h-3 w-3" />
               <span>{followUp.date} at {followUp.time}</span>
             </div>
-            <div className="p-2 bg-primary/5 rounded-lg border border-primary/10">
-              <p className="text-sm">
-                <span className="font-medium text-primary">AI Suggestion: </span>
-                {followUp.aiSuggestion}
-              </p>
-            </div>
+            <p className="text-xs text-primary">{followUp.aiSuggestion}</p>
           </Card>
         ))}
       </div>

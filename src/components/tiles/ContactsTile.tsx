@@ -34,32 +34,24 @@ const ContactsTile = () => {
   };
 
   return (
-    <div className="glass-tile gradient-contacts p-6 hover-scale h-full overflow-auto custom-scrollbar">
-      <h2 className="text-xl font-semibold mb-4">Contacts</h2>
+    <div className="glass-tile gradient-contacts p-4 hover-scale h-full flex flex-col">
+      <h2 className="text-lg font-semibold mb-3">Contacts</h2>
       
-      <div className="space-y-3">
-        {contacts.map((contact) => (
+      <div className="space-y-2 overflow-auto custom-scrollbar flex-1">
+        {contacts.slice(0, 4).map((contact) => (
           <Card
             key={contact.id}
-            className="p-4 bg-white/60 border-white/40 hover:bg-white/80 transition-all cursor-pointer"
+            className="p-3 bg-white/60 border-white/40 hover:bg-white/80 transition-all cursor-pointer"
           >
-            <div className="grid grid-cols-5 gap-4 items-center">
-              <div>
-                <p className="font-medium">{contact.name}</p>
-                <p className="text-sm text-muted-foreground">{contact.company}</p>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm truncate">{contact.name}</p>
+                <p className="text-xs text-muted-foreground truncate">{contact.company}</p>
               </div>
-              <div className="flex justify-center">
-                <Badge className={getIntentColor(contact.intent)}>
-                  {contact.intent}
-                </Badge>
-              </div>
-              <p className="text-sm text-center">{contact.followUpDate}</p>
-              <p className="font-semibold text-center">{contact.dealValue}</p>
-              <div className="flex justify-end">
-                <button className="px-3 py-1 text-sm bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors">
-                  View Details
-                </button>
-              </div>
+              <Badge className={`${getIntentColor(contact.intent)} text-xs`}>
+                {contact.intent}
+              </Badge>
+              <p className="font-semibold text-sm">{contact.dealValue}</p>
             </div>
           </Card>
         ))}

@@ -32,34 +32,26 @@ const DealsTile = () => {
   };
 
   return (
-    <div className="glass-tile gradient-deals p-6 hover-scale h-full overflow-auto custom-scrollbar">
-      <h2 className="text-xl font-semibold mb-4">Deals</h2>
+    <div className="glass-tile gradient-deals p-4 hover-scale h-full flex flex-col">
+      <h2 className="text-lg font-semibold mb-3">Deals</h2>
       
-      <div className="space-y-3">
-        {deals.map((deal) => (
+      <div className="space-y-2 overflow-auto custom-scrollbar flex-1">
+        {deals.slice(0, 3).map((deal) => (
           <Card
             key={deal.id}
-            className="p-4 bg-white/60 border-white/40 hover:bg-white/80 transition-all"
+            className="p-3 bg-white/60 border-white/40 hover:bg-white/80 transition-all"
           >
-            <div className="flex justify-between items-start mb-3">
-              <div>
-                <h3 className="font-semibold mb-1">{deal.name}</h3>
-                <Badge className={getStageColor(deal.stage)}>
+            <div className="flex justify-between items-start gap-2">
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-sm mb-1 truncate">{deal.name}</h3>
+                <Badge className={`${getStageColor(deal.stage)} text-xs`}>
                   {deal.stage}
                 </Badge>
               </div>
               <div className="text-right">
-                <p className="text-xl font-bold text-primary">{deal.value}</p>
-                <p className="text-xs text-muted-foreground">Close: {deal.closeDate}</p>
+                <p className="text-lg font-bold text-primary">{deal.value}</p>
+                <p className="text-xs text-muted-foreground whitespace-nowrap">{deal.closeDate}</p>
               </div>
-            </div>
-            <div className="flex gap-2">
-              <button className="flex-1 px-3 py-1.5 text-sm bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors">
-                View
-              </button>
-              <button className="flex-1 px-3 py-1.5 text-sm bg-muted hover:bg-muted/80 rounded-lg transition-colors">
-                Update
-              </button>
             </div>
           </Card>
         ))}

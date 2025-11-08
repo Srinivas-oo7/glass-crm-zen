@@ -5,6 +5,7 @@ import ContactsTile from "@/components/tiles/ContactsTile";
 import DealsTile from "@/components/tiles/DealsTile";
 import FollowUpsTile from "@/components/tiles/FollowUpsTile";
 import CalendarTile from "@/components/tiles/CalendarTile";
+import TodaysTasksTile from "@/components/tiles/TodaysTasksTile";
 import AIAssistant from "@/components/AIAssistant";
 import SettingsModal from "@/components/SettingsModal";
 
@@ -15,25 +16,29 @@ const Index = () => {
     <div className="min-h-screen pb-6">
       <TopNav onSettingsClick={() => setSettingsOpen(true)} />
       
-      <main className="px-4 max-w-[1600px] mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
-          <div className="lg:col-span-2 min-h-[500px]">
+      <main className="px-4 max-w-[1800px] mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 h-[calc(100vh-140px)]">
+          <div className="lg:col-span-2 lg:row-span-2">
             <DashboardTile />
           </div>
           
-          <div className="min-h-[500px]">
+          <div className="lg:row-span-2">
             <ContactsTile />
           </div>
           
-          <div className="min-h-[500px]">
+          <div>
             <DealsTile />
           </div>
           
-          <div className="min-h-[500px]">
+          <div>
             <FollowUpsTile />
           </div>
           
-          <div className="min-h-[500px]">
+          <div>
+            <TodaysTasksTile />
+          </div>
+          
+          <div>
             <CalendarTile />
           </div>
         </div>

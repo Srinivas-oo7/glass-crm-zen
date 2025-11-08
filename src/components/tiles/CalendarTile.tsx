@@ -19,29 +19,29 @@ const CalendarTile = () => {
   const today = 8;
 
   return (
-    <div className="glass-tile gradient-calendar p-6 hover-scale h-full overflow-auto custom-scrollbar">
-      <h2 className="text-xl font-semibold mb-4">Calendar</h2>
+    <div className="glass-tile gradient-calendar p-4 hover-scale h-full flex flex-col">
+      <h2 className="text-lg font-semibold mb-3">Calendar</h2>
       
-      <Card className="p-4 bg-white/60 border-white/40">
-        <div className="flex items-center justify-between mb-4">
-          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-            <ChevronLeft className="h-4 w-4" />
+      <Card className="p-3 bg-white/60 border-white/40 flex-1 flex flex-col">
+        <div className="flex items-center justify-between mb-3">
+          <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full">
+            <ChevronLeft className="h-3 w-3" />
           </Button>
-          <h3 className="font-semibold">{currentMonth}</h3>
-          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-            <ChevronRight className="h-4 w-4" />
+          <h3 className="font-semibold text-sm">{currentMonth}</h3>
+          <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full">
+            <ChevronRight className="h-3 w-3" />
           </Button>
         </div>
 
-        <div className="grid grid-cols-7 gap-2 mb-2">
+        <div className="grid grid-cols-7 gap-1 mb-1">
           {days.map((day) => (
             <div key={day} className="text-center text-xs font-medium text-muted-foreground">
-              {day}
+              {day.slice(0, 1)}
             </div>
           ))}
         </div>
 
-        <div className="grid grid-cols-7 gap-2">
+        <div className="grid grid-cols-7 gap-1 mb-3">
           {dates.flat().map((date, index) => {
             if (!date) {
               return <div key={`empty-${index}`} />;
@@ -54,7 +54,7 @@ const CalendarTile = () => {
               <button
                 key={date}
                 className={`
-                  aspect-square rounded-lg flex items-center justify-center text-sm font-medium transition-all
+                  aspect-square rounded-md flex items-center justify-center text-xs font-medium transition-all
                   ${isToday ? "bg-primary text-primary-foreground" : ""}
                   ${isHighlighted && !isToday ? "bg-primary/10 text-primary" : ""}
                   ${!isToday && !isHighlighted ? "hover:bg-muted" : ""}
@@ -66,17 +66,16 @@ const CalendarTile = () => {
           })}
         </div>
 
-        <div className="mt-4 pt-4 border-t border-white/40">
-          <h4 className="text-sm font-medium mb-3">Upcoming Events</h4>
-          <div className="space-y-2">
+        <div className="pt-3 border-t border-white/40">
+          <h4 className="text-xs font-medium mb-2">Upcoming</h4>
+          <div className="space-y-1.5">
             {[
-              { date: "Nov 9", event: "Follow-up: Alice J." },
-              { date: "Nov 10", event: "Demo: Bob Smith" },
-              { date: "Nov 11", event: "Contract: Carol W." },
+              { date: "Nov 9", event: "Alice J." },
+              { date: "Nov 10", event: "Bob Smith" },
             ].map((item, index) => (
-              <div key={index} className="flex justify-between text-sm">
+              <div key={index} className="flex justify-between text-xs">
                 <span className="text-muted-foreground">{item.date}</span>
-                <span className="font-medium">{item.event}</span>
+                <span className="font-medium truncate ml-2">{item.event}</span>
               </div>
             ))}
           </div>
