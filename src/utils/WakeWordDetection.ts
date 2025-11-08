@@ -2,9 +2,11 @@ export class WakeWordDetector {
   private recognition: any;
   private isListening = false;
   private onWakeWord: () => void;
+  private onEndCommand?: () => void;
 
-  constructor(onWakeWord: () => void) {
+  constructor(onWakeWord: () => void, onEndCommand?: () => void) {
     this.onWakeWord = onWakeWord;
+    this.onEndCommand = onEndCommand;
     
     // Check for browser support
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -26,6 +28,19 @@ export class WakeWordDetector {
         .trim();
 
       console.log('Heard:', transcript);
+
+      // Check for end command
+      if (
+        transcript.includes('end crm') ||
+        transcript.includes('end see are em') ||
+        transcript.includes('end c r m')
+      ) {
+        console.log('End command detected!');
+        if (this.onEndCommand) {
+          this.onEndCommand();
+        }
+        return;
+      }
 
       // Check for wake word variations
       if (

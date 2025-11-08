@@ -34,6 +34,25 @@ const AIAssistant = () => {
     
     try {
       console.log('Starting wake word detection...');
+      
+      const handleEndCommand = () => {
+        console.log('End CRM command detected via wake word detector');
+        setIsActive(false);
+        setCurrentMessage("");
+        setUserQuery("");
+        setHighlightedTile(null);
+        setConversationHistory([]);
+        isProcessingRef.current = false;
+        if (wakeWordDetectorRef.current) {
+          wakeWordDetectorRef.current.stop();
+          wakeWordDetectorRef.current = null;
+        }
+        if (queryRecognitionRef.current) {
+          queryRecognitionRef.current.stop();
+          queryRecognitionRef.current = null;
+        }
+      };
+      
       wakeWordDetectorRef.current = new WakeWordDetector(() => {
         console.log('Wake word "Hey CRM" detected - listening for query');
         isProcessingRef.current = true;
@@ -49,7 +68,8 @@ const AIAssistant = () => {
         }
         
         startQueryRecognition();
-      });
+      }, handleEndCommand);
+      
       wakeWordDetectorRef.current.start();
       setAssistantState('listening-wake');
     } catch (error) {
@@ -100,6 +120,17 @@ const AIAssistant = () => {
       const transcript = event.results[0][0].transcript;
       console.log('Query:', transcript);
       
+      // Check for "End CRM" command
+      if (transcript.toLowerCase().includes('end crm')) {
+        console.log('End CRM detected in query');
+        if (queryRecognitionRef.current) {
+          queryRecognitionRef.current.stop();
+          queryRecognitionRef.current = null;
+        }
+        await handleQuery(transcript);
+        return;
+      }
+      
       if (event.results[0].isFinal) {
         setUserQuery(transcript);
         if (queryRecognitionRef.current) {
@@ -125,6 +156,22 @@ const AIAssistant = () => {
 
   const handleQuery = async (query: string) => {
     setAssistantState('processing');
+
+    // Check for "End CRM" command
+    if (query.toLowerCase().includes('end crm')) {
+      setCurrentMessage("Goodbye! Say 'Hey CRM' anytime you need me.");
+      setTimeout(() => {
+        setIsActive(false);
+        setCurrentMessage("");
+        setUserQuery("");
+        setHighlightedTile(null);
+        setConversationHistory([]);
+        isProcessingRef.current = false;
+        setAssistantState('listening-wake');
+        setTimeout(() => startWakeWordDetection(), 500);
+      }, 2000);
+      return;
+    }
 
     try {
       // Add user message to history
@@ -157,7 +204,7 @@ const AIAssistant = () => {
         setHighlightedTile({ id: 'deals', name: 'Deals' });
       } else if (lowerQuery.includes('follow') || lowerQuery.includes('followup')) {
         setHighlightedTile({ id: 'followups', name: 'Follow-ups' });
-      } else if (lowerQuery.includes('task') || lowerQuery.includes('today')) {
+      } else if (lowerQuery.includes('task') || lowerQuery.includes('today') || lowerQuery.includes('remind')) {
         setHighlightedTile({ id: 'tasks', name: 'Tasks' });
       } else if (lowerQuery.includes('meeting') || lowerQuery.includes('calendar')) {
         setHighlightedTile({ id: 'calendar', name: 'Calendar' });
@@ -167,12 +214,24 @@ const AIAssistant = () => {
         setHighlightedTile({ id: 'contacts', name: 'Email Campaigns' });
       }
 
-      console.log('Response received, will auto-dismiss in 8 seconds');
+      console.log('Response received, will hide overlay to show tile');
       
-      // Auto-dismiss after 8 seconds
+      // Show response for 4 seconds, then hide overlay to show tile
       setTimeout(() => {
-        handleDismiss();
-      }, 8000);
+        setIsActive(false);
+        console.log('Overlay hidden, showing highlighted tile');
+        
+        // After 5 seconds of showing the tile, bring overlay back
+        setTimeout(() => {
+          setIsActive(true);
+          setUserQuery("");
+          setCurrentMessage("");
+          console.log('Overlay back, ready for next command');
+          
+          // Restart query recognition for follow-up
+          startQueryRecognition();
+        }, 5000);
+      }, 4000);
     } catch (error) {
       console.error('Error:', error);
       toast({
@@ -209,9 +268,9 @@ const AIAssistant = () => {
       case 'listening-wake':
         return { color: 'bg-blue-500', text: 'Say "Hey CRM" to activate', pulse: true };
       case 'active':
-        return { color: 'bg-green-500', text: 'Listening for your query...', pulse: true };
+        return { color: 'bg-green-500', text: 'Listening... (Say "End CRM" to stop)', pulse: true };
       case 'processing':
-        return { color: 'bg-yellow-500', text: 'Processing...', pulse: false };
+        return { color: 'bg-yellow-500', text: 'Processing... (Say "End CRM" to stop)', pulse: false };
     }
   };
 

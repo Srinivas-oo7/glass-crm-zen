@@ -34,6 +34,35 @@ serve(async (req) => {
       supabase.from('agent_actions').select('*').eq('status', 'pending').limit(5)
     ]);
 
+    // Detect action items and create tasks
+    const lowerMessage = message.toLowerCase();
+    let actionCreated = false;
+    
+    if (lowerMessage.includes('remind') || lowerMessage.includes('task') || lowerMessage.includes('todo')) {
+      // Extract task details from the message
+      const taskTitle = message.replace(/remind me to|create task to|add task to|todo:/gi, '').trim();
+      
+      if (taskTitle) {
+        // Create a task/meeting for today
+        const today = new Date();
+        today.setHours(today.getHours() + 1); // Schedule 1 hour from now
+        
+        const { error: taskError } = await supabase
+          .from('meetings')
+          .insert({
+            title: taskTitle,
+            scheduled_at: today.toISOString(),
+            status: 'scheduled',
+            lead_id: leadsData.data?.[0]?.id || '00000000-0000-0000-0000-000000000000' // Use first lead or dummy
+          });
+        
+        if (!taskError) {
+          actionCreated = true;
+          console.log('Task created:', taskTitle);
+        }
+      }
+    }
+
     // Build context with actual data
     const dataContext = `
 Current Sales Data:
@@ -65,6 +94,8 @@ PENDING ACTIONS (${actionsData.data?.length || 0}):
 ${actionsData.data?.map(a => 
   `- ${a.action_type} (${a.agent_type}): ${a.status}`
 ).join('\n') || 'No pending actions'}
+
+${actionCreated ? '\n[ACTION COMPLETED: Task has been created and added to your tasks list]' : ''}
 `;
 
     console.log('Data context prepared with live database info');
@@ -91,9 +122,13 @@ ${actionsData.data?.map(a =>
 - Suggesting outreach strategies based on actual lead data
 - Reviewing email campaigns and their performance
 - Managing meeting schedules
+- Creating tasks and reminders when requested
 - Providing actionable insights from the current sales pipeline
 
-Use the provided data context to give specific, data-driven recommendations. Always reference actual numbers and lead names when available. Be concise, actionable, and professional.`
+When users ask you to remind them or create tasks, confirm that the task has been created (the system will handle it automatically).
+Use the provided data context to give specific, data-driven recommendations. Always reference actual numbers and lead names when available. 
+Be concise, actionable, and professional. Keep responses under 2-3 sentences.
+When a task is created, you'll see [ACTION COMPLETED] in the context - acknowledge this to the user.`
             }]
           }
         })
