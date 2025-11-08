@@ -19,63 +19,63 @@ const DashboardTile = () => {
   ];
 
   return (
-    <div className="widget-card p-5 h-full flex flex-col">
-      <h2 className="text-xl font-bold mb-4 text-white">Dashboard</h2>
+    <div className="glass-tile gradient-dashboard p-4 hover-scale h-full flex flex-col">
+      <h2 className="text-lg font-semibold mb-3">Dashboard</h2>
       
-      <div className="grid grid-cols-2 gap-3 mb-4">
+      <div className="grid grid-cols-2 gap-3 mb-3">
         {kpis.map((kpi) => (
-          <div key={kpi.label} className="bg-black/30 rounded-xl p-4 border border-white/10">
+          <Card key={kpi.label} className="p-3 bg-white/60 border-white/40">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs text-white/50 mb-1">{kpi.label}</p>
-                <p className="text-2xl font-bold text-white">{kpi.value}</p>
+                <p className="text-xs text-muted-foreground mb-1">{kpi.label}</p>
+                <p className="text-xl font-bold">{kpi.value}</p>
               </div>
-              <kpi.icon className={`h-5 w-5 ${kpi.color}`} />
+              <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
             </div>
-          </div>
+          </Card>
         ))}
       </div>
 
       <div className="grid grid-cols-2 gap-3 flex-1">
-        <div className="bg-black/30 rounded-xl p-4 border border-white/10">
-          <h3 className="text-sm font-semibold mb-3 text-white">Sales Funnel</h3>
-          <div className="space-y-3">
+        <Card className="p-3 bg-white/60 border-white/40">
+          <h3 className="text-xs font-medium mb-2">Sales Funnel</h3>
+          <div className="space-y-1.5">
             {[
               { stage: "Lead", value: 60 },
               { stage: "Qualified", value: 45 },
               { stage: "Proposal", value: 30 },
             ].map((stage) => (
               <div key={stage.stage}>
-                <div className="flex justify-between text-xs mb-1 text-white/70">
+                <div className="flex justify-between text-xs mb-0.5">
                   <span>{stage.stage}</span>
                   <span>{stage.value}%</span>
                 </div>
-                <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all"
+                    className="h-full bg-primary rounded-full transition-all"
                     style={{ width: `${stage.value}%` }}
                   />
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        </Card>
 
-        <div className="bg-black/30 rounded-xl p-4 border border-white/10">
-          <h3 className="text-sm font-semibold mb-3 text-white">Revenue</h3>
-          <div className="space-y-3">
+        <Card className="p-3 bg-white/60 border-white/40">
+          <h3 className="text-xs font-medium mb-2">Revenue</h3>
+          <div className="space-y-2">
             {[
               { stage: "Discovery", amount: "$120K" },
               { stage: "Proposal", amount: "$180K" },
               { stage: "Negotiation", amount: "$187K" },
             ].map((stage) => (
               <div key={stage.stage} className="flex justify-between items-center">
-                <span className="text-xs text-white/50">{stage.stage}</span>
-                <span className="text-sm font-bold text-white">{stage.amount}</span>
+                <span className="text-xs text-muted-foreground">{stage.stage}</span>
+                <span className="text-sm font-semibold">{stage.amount}</span>
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );

@@ -13,46 +13,33 @@ const Index = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen pb-6">
       <TopNav onSettingsClick={() => setSettingsOpen(true)} />
       
-      <main className="px-6 py-4">
-        <div className="max-w-[1600px] mx-auto flex gap-4">
-          {/* Main content area */}
-          <div className="flex-1">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-              <DashboardTile />
-              <ContactsTile />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <DealsTile />
-              <FollowUpsTile />
-              <TodaysTasksTile />
-            </div>
+      <main className="px-4 max-w-[1800px] mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 h-[calc(100vh-140px)]">
+          <div className="lg:col-span-2 lg:row-span-2">
+            <DashboardTile />
           </div>
-
-          {/* Widget sidebar */}
-          <div className="hidden xl:block w-96">
-            <div className="space-y-4 sticky top-4">
-              <CalendarTile />
-              <div className="widget-card p-4">
-                <h3 className="text-sm font-semibold mb-2 text-white/80">Quick Stats</h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-white/60">Total Leads</span>
-                    <span className="text-lg font-bold">128</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-white/60">Active Deals</span>
-                    <span className="text-lg font-bold text-green-400">24</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-white/60">Conv. Rate</span>
-                    <span className="text-lg font-bold text-blue-400">32%</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+          
+          <div className="lg:row-span-2">
+            <ContactsTile />
+          </div>
+          
+          <div>
+            <DealsTile />
+          </div>
+          
+          <div>
+            <FollowUpsTile />
+          </div>
+          
+          <div>
+            <TodaysTasksTile />
+          </div>
+          
+          <div>
+            <CalendarTile />
           </div>
         </div>
       </main>

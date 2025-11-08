@@ -28,6 +28,7 @@ const ContactsTile = () => {
 
     fetchContacts();
     
+    // Subscribe to realtime changes
     const channel = supabase
       .channel('leads-changes')
       .on('postgres_changes', { 
@@ -45,9 +46,9 @@ const ContactsTile = () => {
   }, []);
 
   const getScoreColor = (score: number) => {
-    if (score >= 70) return "bg-green-500/20 text-green-300 border-green-500/30";
-    if (score >= 40) return "bg-yellow-500/20 text-yellow-300 border-yellow-500/30";
-    return "bg-gray-500/20 text-gray-300 border-gray-500/30";
+    if (score >= 70) return "bg-success/10 text-success hover:bg-success/20";
+    if (score >= 40) return "bg-warning/10 text-warning hover:bg-warning/20";
+    return "bg-muted text-muted-foreground hover:bg-muted";
   };
 
   const getScoreLabel = (score: number) => {
@@ -57,33 +58,31 @@ const ContactsTile = () => {
   };
 
   return (
-    <div className="widget-card p-5 h-full flex flex-col">
-      <h2 className="text-xl font-bold mb-4 text-white">Top Contacts</h2>
+    <div className="glass-tile gradient-contacts p-4 hover-scale h-full flex flex-col">
+      <h2 className="text-lg font-semibold mb-3">Contacts</h2>
       
-      <div className="space-y-3 overflow-auto flex-1">
+      <div className="space-y-2 overflow-auto custom-scrollbar flex-1">
         {contacts.length === 0 ? (
-          <p className="text-white/50 text-sm">No contacts yet</p>
+          <p className="text-muted-foreground text-sm">No contacts yet</p>
         ) : (
           contacts.map((contact) => (
-            <div
+            <Card
               key={contact.id}
-              className="bg-black/30 rounded-xl p-4 hover:bg-black/40 transition-all cursor-pointer border border-white/10"
+              className="p-3 bg-white/60 border-white/40 hover:bg-white/80 transition-all cursor-pointer"
             >
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-white text-base truncate">{contact.name}</p>
-                  <p className="text-sm text-white/60 truncate">
+                  <p className="font-medium text-sm truncate">{contact.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">
                     {contact.company || contact.industry || 'Unknown'}
                   </p>
                 </div>
-                <div className="flex flex-col items-end gap-2">
-                  <Badge className={`${getScoreColor(contact.lead_score)} text-xs border`}>
-                    {getScoreLabel(contact.lead_score)}
-                  </Badge>
-                  <span className="text-xs text-white/40">{contact.status}</span>
-                </div>
+                <Badge className={`${getScoreColor(contact.lead_score)} text-xs`}>
+                  {getScoreLabel(contact.lead_score)}
+                </Badge>
+                <p className="font-semibold text-sm">{contact.status}</p>
               </div>
-            </div>
+            </Card>
           ))
         )}
       </div>
