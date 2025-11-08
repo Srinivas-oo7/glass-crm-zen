@@ -42,7 +42,7 @@ const MeetingSimulation = () => {
           company: 'Tech Innovations Inc',
           industry: 'Technology',
           status: 'new',
-          source: 'simulation',
+          source: 'manual',
           lead_score: 75
         })
         .select()
