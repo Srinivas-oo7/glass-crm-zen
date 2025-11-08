@@ -12,7 +12,8 @@ serve(async (req) => {
   }
 
   try {
-    const { meetingId, action } = await req.json();
+    const body = await req.json();
+    const { meetingId, action, transcript, duration, outcome } = body;
     
     console.log('Meeting voice agent called with action:', action, 'meetingId:', meetingId);
     
@@ -174,7 +175,9 @@ Then your verbal response.`,
 
       case 'analyze_transcript': {
         // Analyze ongoing conversation and update confidence
-        const { transcript, duration } = await req.json();
+        if (!transcript) {
+          throw new Error('Transcript is required for analyze_transcript action');
+        }
 
         const response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
@@ -257,7 +260,9 @@ Format response as JSON:
 
       case 'complete': {
         // Meeting ended - generate summary
-        const { transcript, outcome } = await req.json();
+        if (!transcript) {
+          throw new Error('Transcript is required for complete action');
+        }
 
         const response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
