@@ -23,25 +23,35 @@ const AIAssistant = () => {
   const [userQuery, setUserQuery] = useState("");
   const [assistantState, setAssistantState] = useState<AssistantState>('listening-wake');
   const [highlightedTile, setHighlightedTile] = useState<HighlightedTile | null>(null);
+  const [conversationHistory, setConversationHistory] = useState<Message[]>([]);
   const { toast } = useToast();
   const wakeWordDetectorRef = useRef<WakeWordDetector | null>(null);
-  const voiceRecognitionRef = useRef<any>(null);
   const queryRecognitionRef = useRef<any>(null);
+  const isProcessingRef = useRef(false);
 
-  useEffect(() => {
-    // Start listening for wake word immediately on mount
+  const startWakeWordDetection = () => {
+    if (wakeWordDetectorRef.current || isProcessingRef.current) return;
+    
     try {
+      console.log('Starting wake word detection...');
       wakeWordDetectorRef.current = new WakeWordDetector(() => {
         console.log('Wake word "Hey CRM" detected - listening for query');
+        isProcessingRef.current = true;
         setAssistantState('active');
         setIsActive(true);
         setUserQuery("");
         setCurrentMessage("");
+        
+        // Stop wake word detection while processing query
+        if (wakeWordDetectorRef.current) {
+          wakeWordDetectorRef.current.stop();
+          wakeWordDetectorRef.current = null;
+        }
+        
         startQueryRecognition();
       });
       wakeWordDetectorRef.current.start();
       setAssistantState('listening-wake');
-      console.log('Wake word detection active - say "Hey CRM" to activate');
     } catch (error) {
       console.error('Error starting wake word detection:', error);
       toast({
@@ -50,13 +60,20 @@ const AIAssistant = () => {
         variant: "destructive"
       });
     }
+  };
+
+  useEffect(() => {
+    // Start listening for wake word immediately on mount
+    startWakeWordDetection();
 
     return () => {
       if (wakeWordDetectorRef.current) {
         wakeWordDetectorRef.current.stop();
+        wakeWordDetectorRef.current = null;
       }
       if (queryRecognitionRef.current) {
         queryRecognitionRef.current.stop();
+        queryRecognitionRef.current = null;
       }
     };
   }, []);
@@ -70,8 +87,7 @@ const AIAssistant = () => {
         description: "Speech recognition not supported",
         variant: "destructive"
       });
-      setIsActive(false);
-      setAssistantState('listening-wake');
+      handleDismiss();
       return;
     }
 
@@ -86,14 +102,17 @@ const AIAssistant = () => {
       
       if (event.results[0].isFinal) {
         setUserQuery(transcript);
+        if (queryRecognitionRef.current) {
+          queryRecognitionRef.current.stop();
+          queryRecognitionRef.current = null;
+        }
         await handleQuery(transcript);
       }
     };
 
     recognition.onerror = (event: any) => {
       console.error('Speech recognition error:', event.error);
-      setIsActive(false);
-      setAssistantState('listening-wake');
+      handleDismiss();
     };
 
     recognition.onend = () => {
@@ -108,15 +127,26 @@ const AIAssistant = () => {
     setAssistantState('processing');
 
     try {
+      // Add user message to history
+      const userMessage: Message = { role: 'user', content: query };
+      const newHistory = [...conversationHistory, userMessage];
+
       const { data, error } = await supabase.functions.invoke('voice-assistant', {
         body: { 
           message: query,
-          conversationHistory: []
+          conversationHistory: newHistory.map(m => ({
+            role: m.role,
+            parts: [{ text: m.content }]
+          }))
         }
       });
 
       if (error) throw error;
 
+      // Add assistant message to history
+      const assistantMessage: Message = { role: 'assistant', content: data.message };
+      const updatedHistory = [...newHistory, assistantMessage];
+      setConversationHistory(updatedHistory);
       setCurrentMessage(data.message);
       
       // Determine which tile to highlight based on the query
@@ -133,8 +163,12 @@ const AIAssistant = () => {
         setHighlightedTile({ id: 'calendar', name: 'Calendar' });
       } else if (lowerQuery.includes('dashboard') || lowerQuery.includes('overview')) {
         setHighlightedTile({ id: 'dashboard', name: 'Dashboard' });
+      } else if (lowerQuery.includes('email')) {
+        setHighlightedTile({ id: 'contacts', name: 'Email Campaigns' });
       }
 
+      console.log('Response received, will auto-dismiss in 8 seconds');
+      
       // Auto-dismiss after 8 seconds
       setTimeout(() => {
         handleDismiss();
@@ -151,15 +185,23 @@ const AIAssistant = () => {
   };
 
   const handleDismiss = () => {
+    console.log('Dismissing overlay, restarting wake word detection');
     setIsActive(false);
     setCurrentMessage("");
     setUserQuery("");
     setHighlightedTile(null);
-    setAssistantState('listening-wake');
+    isProcessingRef.current = false;
     
     if (queryRecognitionRef.current) {
       queryRecognitionRef.current.stop();
+      queryRecognitionRef.current = null;
     }
+    
+    // Restart wake word detection
+    setAssistantState('listening-wake');
+    setTimeout(() => {
+      startWakeWordDetection();
+    }, 500);
   };
 
   const getStateIndicator = () => {
