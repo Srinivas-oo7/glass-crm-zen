@@ -6,6 +6,7 @@ import DealsTile from "@/components/tiles/DealsTile";
 import FollowUpsTile from "@/components/tiles/FollowUpsTile";
 import CalendarTile from "@/components/tiles/CalendarTile";
 import TodaysTasksTile from "@/components/tiles/TodaysTasksTile";
+import AgentActivityTile from "@/components/tiles/AgentActivityTile";
 import AIAssistant from "@/components/AIAssistant";
 import SettingsModal from "@/components/SettingsModal";
 import LeadGenerationModal from "@/components/LeadGenerationModal";
@@ -51,6 +52,10 @@ const Index = () => {
           
           <div data-tile-id="calendar">
             <CalendarTile />
+          </div>
+
+          <div className="lg:col-span-2" data-tile-id="agent-activity">
+            <AgentActivityTile />
           </div>
         </div>
       </main>

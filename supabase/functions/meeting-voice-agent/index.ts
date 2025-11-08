@@ -1,0 +1,309 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { meetingId, action } = await req.json();
+    const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    if (!geminiApiKey) {
+      throw new Error('GEMINI_API_KEY not configured');
+    }
+
+    console.log('Meeting voice agent action:', action, 'for meeting:', meetingId);
+
+    // Fetch meeting details
+    const { data: meeting, error: meetingError } = await supabase
+      .from('meetings')
+      .select('*, leads(name, email, company, notes, status, lead_score)')
+      .eq('id', meetingId)
+      .single();
+
+    if (meetingError || !meeting) {
+      throw new Error('Meeting not found');
+    }
+
+    const lead = meeting.leads;
+
+    switch (action) {
+      case 'prepare': {
+        // Prepare context for AI agent before meeting starts
+        const { data: previousCampaigns } = await supabase
+          .from('email_campaigns')
+          .select('*')
+          .eq('lead_id', lead.id)
+          .order('created_at', { ascending: false })
+          .limit(3);
+
+        const context = {
+          leadName: lead.name,
+          company: lead.company,
+          leadScore: lead.lead_score,
+          status: lead.status,
+          notes: lead.notes,
+          previousInteractions: previousCampaigns?.map(c => ({
+            subject: c.subject,
+            sentAt: c.sent_at,
+            status: c.draft_status
+          })) || [],
+          meetingTitle: meeting.title,
+          scheduledAt: meeting.scheduled_at
+        };
+
+        // Generate talking points using Gemini
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{
+                  text: `You are preparing for a sales meeting. Generate 5 key talking points and 3 potential objections with responses.
+
+Lead Context:
+- Name: ${context.leadName}
+- Company: ${context.company}
+- Lead Score: ${context.leadScore}
+- Status: ${context.status}
+- Notes: ${context.notes}
+
+Previous Interactions: ${JSON.stringify(context.previousInteractions)}
+
+Format:
+TALKING POINTS:
+1. [Point]
+2. [Point]
+...
+
+POTENTIAL OBJECTIONS:
+1. [Objection] → [Response]
+...`
+                }]
+              }]
+            })
+          }
+        );
+
+        const data = await response.json();
+        const agentNotes = data.candidates[0]?.content?.parts[0]?.text || '';
+
+        await supabase
+          .from('meetings')
+          .update({ 
+            agent_notes: agentNotes,
+            status: 'prepared'
+          })
+          .eq('id', meetingId);
+
+        return new Response(
+          JSON.stringify({ success: true, notes: agentNotes, context }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'join': {
+        // Mark agent as joined
+        await supabase
+          .from('meetings')
+          .update({ 
+            agent_joined_at: new Date().toISOString(),
+            status: 'in_progress'
+          })
+          .eq('id', meetingId);
+
+        // Initialize Gemini Live session configuration
+        const liveConfig = {
+          model: "gemini-2.0-flash-exp",
+          systemInstruction: `You are an AI sales agent in a meeting with ${lead.name} from ${lead.company}.
+
+Your goal: Close the deal by addressing concerns, highlighting value, and moving toward commitment.
+
+Context:
+- Lead Score: ${lead.lead_score}
+- Status: ${lead.status}
+- Notes: ${lead.notes || 'No prior notes'}
+- Meeting Notes: ${meeting.agent_notes || 'No preparation notes'}
+
+Guidelines:
+1. Be professional, friendly, and solution-focused
+2. Listen actively and address objections directly
+3. Continuously assess sentiment (0-1 scale)
+4. If confidence drops below 0.5, prepare to alert manager
+5. Try to identify next steps or commitment
+
+Response format after each exchange:
+[CONFIDENCE: 0.X] [SENTIMENT: positive/neutral/negative]
+Then your verbal response.`,
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 500
+          }
+        };
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: 'Agent joined meeting',
+            liveConfig,
+            meetingContext: {
+              leadName: lead.name,
+              company: lead.company,
+              agentNotes: meeting.agent_notes
+            }
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'analyze_transcript': {
+        // Analyze ongoing conversation and update confidence
+        const { transcript, duration } = await req.json();
+
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{
+                  text: `Analyze this sales meeting transcript and provide:
+1. Confidence score (0-1): How likely is deal closure?
+2. Sentiment: positive/neutral/negative
+3. Key concerns mentioned
+4. Recommended next actions
+5. Should manager be alerted? (yes/no and why)
+
+Transcript:
+${transcript}
+
+Format response as JSON:
+{
+  "confidence": 0.X,
+  "sentiment": "...",
+  "concerns": ["..."],
+  "nextActions": ["..."],
+  "alertManager": { "needed": true/false, "reason": "..." }
+}`
+                }]
+              }]
+            })
+          }
+        );
+
+        const data = await response.json();
+        const analysisText = data.candidates[0]?.content?.parts[0]?.text || '{}';
+        const analysis = JSON.parse(analysisText.replace(/```json\n?|\n?```/g, ''));
+
+        // Update meeting with analysis
+        await supabase
+          .from('meetings')
+          .update({ 
+            real_time_transcript: transcript,
+            ai_agent_confidence_score: analysis.confidence,
+            sentiment_analysis: analysis,
+            meeting_duration: duration
+          })
+          .eq('id', meetingId);
+
+        // Alert manager if confidence is low
+        if (analysis.alertManager.needed || analysis.confidence < 0.5) {
+          await supabase
+            .from('meetings')
+            .update({ 
+              manager_alert_triggered: true,
+              manager_alert_reason: analysis.alertManager.reason || 'Low confidence in deal closure'
+            })
+            .eq('id', meetingId);
+
+          // Create agent action for manager
+          await supabase.from('agent_actions').insert({
+            agent_type: 'meeting_voice_agent',
+            action_type: 'manager_alert',
+            status: 'pending',
+            requires_approval: false,
+            data: {
+              meeting_id: meetingId,
+              lead_name: lead.name,
+              confidence: analysis.confidence,
+              reason: analysis.alertManager.reason,
+              summary: `Meeting with ${lead.name} needs attention. Confidence: ${(analysis.confidence * 100).toFixed(0)}%. ${analysis.alertManager.reason}`
+            }
+          });
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, analysis }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'complete': {
+        // Meeting ended - generate summary
+        const { transcript, outcome } = await req.json();
+
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{
+                  text: `Summarize this sales meeting in 3-4 sentences. Include:
+- What was discussed
+- Any commitments made
+- Next steps
+- Overall outcome
+
+Transcript:
+${transcript}`
+                }]
+              }]
+            })
+          }
+        );
+
+        const data = await response.json();
+        const summary = data.candidates[0]?.content?.parts[0]?.text || '';
+
+        await supabase
+          .from('meetings')
+          .update({ 
+            status: 'completed',
+            conversation_summary: summary,
+            outcome: outcome,
+            transcript: transcript
+          })
+          .eq('id', meetingId);
+
+        return new Response(
+          JSON.stringify({ success: true, summary }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      default:
+        throw new Error('Invalid action');
+    }
+  } catch (error) {
+    console.error('Error in meeting voice agent:', error);
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+});

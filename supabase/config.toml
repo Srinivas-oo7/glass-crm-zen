@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.agent-orchestrator]
 verify_jwt = false
+
+[functions.meeting-voice-agent]
+verify_jwt = false

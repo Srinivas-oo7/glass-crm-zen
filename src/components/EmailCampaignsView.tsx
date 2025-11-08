@@ -7,6 +7,9 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Mail, Send, Trash2, Edit, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import EmailRepliesView from "./EmailRepliesView";
+import ActiveMeetingsView from "./ActiveMeetingsView";
 
 interface EmailCampaignsViewProps {
   open: boolean;
@@ -132,14 +135,22 @@ const EmailCampaignsView = ({ open, onOpenChange }: EmailCampaignsViewProps) => 
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Mail className="h-5 w-5" />
-            Email Campaigns
+            Sales Communications
           </DialogTitle>
           <DialogDescription>
-            Manage and send email campaigns to your leads
+            Manage emails, replies, and active meetings
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="h-[500px] pr-4">
+        <Tabs defaultValue="campaigns" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
+            <TabsTrigger value="replies">Pending Replies</TabsTrigger>
+            <TabsTrigger value="meetings">Active Meetings</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="campaigns">
+            <ScrollArea className="h-[500px] pr-4">
           {isLoading ? (
             <div className="flex items-center justify-center h-40">
               <Loader2 className="h-8 w-8 animate-spin" />
@@ -214,7 +225,21 @@ const EmailCampaignsView = ({ open, onOpenChange }: EmailCampaignsViewProps) => 
               ))}
             </div>
           )}
-        </ScrollArea>
+            </ScrollArea>
+          </TabsContent>
+
+          <TabsContent value="replies">
+            <ScrollArea className="h-[500px] pr-4">
+              <EmailRepliesView />
+            </ScrollArea>
+          </TabsContent>
+
+          <TabsContent value="meetings">
+            <ScrollArea className="h-[500px] pr-4">
+              <ActiveMeetingsView />
+            </ScrollArea>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
