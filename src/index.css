@@ -24,6 +24,7 @@ All colors MUST be HSL.
     /* Apple blue accent */
     --primary: 211 100% 50%; /* #007AFF */
     --primary-foreground: 0 0% 100%;
+    --primary-rgb: 0, 122, 255;
     
     /* Subtle secondary surfaces */
     --secondary: 220 60% 96%; /* #D6E0FF */

@@ -29,27 +29,27 @@ const Index = () => {
       
       <main className="px-4 max-w-[1800px] mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 h-[calc(100vh-140px)]">
-          <div className="lg:col-span-2 lg:row-span-2">
+          <div className="lg:col-span-2 lg:row-span-2" data-tile-id="dashboard">
             <DashboardTile />
           </div>
           
-          <div className="lg:row-span-2">
+          <div className="lg:row-span-2" data-tile-id="contacts">
             <ContactsTile />
           </div>
           
-          <div>
+          <div data-tile-id="deals">
             <DealsTile />
           </div>
           
-          <div>
+          <div data-tile-id="followups">
             <FollowUpsTile />
           </div>
           
-          <div>
+          <div data-tile-id="tasks">
             <TodaysTasksTile />
           </div>
           
-          <div>
+          <div data-tile-id="calendar">
             <CalendarTile />
           </div>
         </div>
