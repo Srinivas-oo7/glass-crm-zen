@@ -19,29 +19,29 @@ const CalendarTile = () => {
   const today = 8;
 
   return (
-    <div className="glass-tile gradient-calendar p-4 hover-scale h-full flex flex-col">
-      <h2 className="text-lg font-semibold mb-3">Calendar</h2>
+    <div className="widget-card p-5 h-full flex flex-col">
+      <h2 className="text-xl font-bold mb-4 text-white">Calendar</h2>
       
-      <Card className="p-3 bg-white/60 border-white/40 flex-1 flex flex-col">
-        <div className="flex items-center justify-between mb-3">
-          <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full">
-            <ChevronLeft className="h-3 w-3" />
+      <div className="bg-black/30 rounded-xl p-4 border border-white/10 flex-1 flex flex-col">
+        <div className="flex items-center justify-between mb-4">
+          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-white/10 text-white">
+            <ChevronLeft className="h-4 w-4" />
           </Button>
-          <h3 className="font-semibold text-sm">{currentMonth}</h3>
-          <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full">
-            <ChevronRight className="h-3 w-3" />
+          <h3 className="font-bold text-base text-white">{currentMonth}</h3>
+          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-white/10 text-white">
+            <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
 
-        <div className="grid grid-cols-7 gap-1 mb-1">
+        <div className="grid grid-cols-7 gap-2 mb-2">
           {days.map((day) => (
-            <div key={day} className="text-center text-xs font-medium text-muted-foreground">
+            <div key={day} className="text-center text-xs font-semibold text-white/50">
               {day.slice(0, 1)}
             </div>
           ))}
         </div>
 
-        <div className="grid grid-cols-7 gap-1 mb-3">
+        <div className="grid grid-cols-7 gap-2 mb-4">
           {dates.flat().map((date, index) => {
             if (!date) {
               return <div key={`empty-${index}`} />;
@@ -54,10 +54,10 @@ const CalendarTile = () => {
               <button
                 key={date}
                 className={`
-                  aspect-square rounded-md flex items-center justify-center text-xs font-medium transition-all
-                  ${isToday ? "bg-primary text-primary-foreground" : ""}
-                  ${isHighlighted && !isToday ? "bg-primary/10 text-primary" : ""}
-                  ${!isToday && !isHighlighted ? "hover:bg-muted" : ""}
+                  aspect-square rounded-lg flex items-center justify-center text-sm font-medium transition-all
+                  ${isToday ? "bg-blue-500 text-white shadow-lg" : ""}
+                  ${isHighlighted && !isToday ? "bg-white/10 text-white" : "text-white/60"}
+                  ${!isToday && !isHighlighted ? "hover:bg-white/5" : ""}
                 `}
               >
                 {date}
@@ -66,21 +66,21 @@ const CalendarTile = () => {
           })}
         </div>
 
-        <div className="pt-3 border-t border-white/40">
-          <h4 className="text-xs font-medium mb-2">Upcoming</h4>
-          <div className="space-y-1.5">
+        <div className="pt-4 border-t border-white/10">
+          <h4 className="text-sm font-semibold mb-3 text-white">Upcoming</h4>
+          <div className="space-y-2">
             {[
               { date: "Nov 9", event: "Alice J." },
               { date: "Nov 10", event: "Bob Smith" },
             ].map((item, index) => (
-              <div key={index} className="flex justify-between text-xs">
-                <span className="text-muted-foreground">{item.date}</span>
-                <span className="font-medium truncate ml-2">{item.event}</span>
+              <div key={index} className="flex justify-between text-sm bg-white/5 rounded-lg p-2">
+                <span className="text-white/50">{item.date}</span>
+                <span className="font-medium text-white truncate ml-2">{item.event}</span>
               </div>
             ))}
           </div>
         </div>
-      </Card>
+      </div>
     </div>
   );
 };

@@ -8,11 +8,11 @@ interface TopNavProps {
 
 const TopNav = ({ onSettingsClick }: TopNavProps) => {
   return (
-    <nav className="glass-tile sticky top-4 mx-4 mb-6 z-50">
-      <div className="px-6 py-4 flex items-center justify-between">
+    <nav className="backdrop-blur-sm bg-black/10 sticky top-0 z-50 border-b border-white/10">
+      <div className="px-6 py-3 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Zero-Click CRM</h1>
-          <p className="text-sm text-muted-foreground">Your CRM that fills itself</p>
+          <h1 className="text-xl font-bold text-white">Zero-Click CRM</h1>
+          <p className="text-sm text-white/60">Powered by AI</p>
         </div>
         
         <div className="flex items-center gap-3">
@@ -20,13 +20,13 @@ const TopNav = ({ onSettingsClick }: TopNavProps) => {
             variant="ghost"
             size="icon"
             onClick={onSettingsClick}
-            className="rounded-full hover:bg-secondary/50"
+            className="rounded-full hover:bg-white/10 text-white"
           >
             <Settings className="h-5 w-5" />
           </Button>
-          <Avatar className="h-10 w-10 border-2 border-primary/20">
+          <Avatar className="h-9 w-9 border-2 border-white/20">
             <AvatarImage src="https://api.dicebear.com/7.x/avataaars/svg?seed=user" />
-            <AvatarFallback>U</AvatarFallback>
+            <AvatarFallback className="bg-white/10 text-white">U</AvatarFallback>
           </Avatar>
         </div>
       </div>
