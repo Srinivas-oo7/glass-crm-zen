@@ -383,12 +383,14 @@ serve(async (req) => {
       }
     }
     
-    // 14. Update lead email
-    if ((lowerMessage.includes('change') || lowerMessage.includes('update')) && lowerMessage.includes('email')) {
-      const leadName = message.match(/(?:change|update)\s+([A-Za-z\s]+?)(?:'s|\s+email)/i)?.[1]?.trim();
-      const emailMatch = message.match(/(?:to|email)\s+([\w.+-]+@[\w.-]+\.\w+)/i)?.[1]?.replace(/\s+/g, '').trim();
+    // 14. Update lead fields (email, phone, company, status, notes)
+    if ((lowerMessage.includes('change') || lowerMessage.includes('update') || lowerMessage.includes('set')) && 
+        (lowerMessage.includes('email') || lowerMessage.includes('phone') || lowerMessage.includes('company') || 
+         lowerMessage.includes('status') || lowerMessage.includes('note'))) {
       
-      if (leadName && emailMatch) {
+      const leadName = message.match(/(?:change|update|set)\s+([A-Za-z\s]+?)(?:'s|\s+email|\s+phone|\s+company|\s+status|\s+note)/i)?.[1]?.trim();
+      
+      if (leadName) {
         const { data: lead } = await supabase
           .from('leads')
           .select('*')
@@ -396,23 +398,129 @@ serve(async (req) => {
           .single();
         
         if (lead) {
-          const { error } = await supabase
-            .from('leads')
-            .update({ email: emailMatch })
-            .eq('id', lead.id);
+          const updates: any = {};
+          let fieldUpdated = '';
           
-          if (!error) {
-            actionResults.push(`Updated ${lead.name}'s email to ${emailMatch}`);
-            actionsTaken.push({ action: 'update_email', lead_id: lead.id, lead_name: lead.name, new_email: emailMatch });
+          // Email update
+          if (lowerMessage.includes('email')) {
+            const emailMatch = message.match(/(?:to|email)\s+([\w.+-]+@[\w.-]+\.\w+)/i)?.[1]?.replace(/\s+/g, '').trim();
+            if (emailMatch) {
+              updates.email = emailMatch;
+              fieldUpdated = `email to ${emailMatch}`;
+            }
+          }
+          
+          // Phone update
+          if (lowerMessage.includes('phone')) {
+            const phoneMatch = message.match(/(?:phone|number)\s+([\d\s\-\+\(\)]+)/i)?.[1]?.trim();
+            if (phoneMatch) {
+              updates.phone = phoneMatch;
+              fieldUpdated = `phone to ${phoneMatch}`;
+            }
+          }
+          
+          // Company update
+          if (lowerMessage.includes('company')) {
+            const companyMatch = message.match(/company\s+(?:to\s+)?([A-Za-z\s]+)/i)?.[1]?.trim();
+            if (companyMatch) {
+              updates.company = companyMatch;
+              fieldUpdated = `company to ${companyMatch}`;
+            }
+          }
+          
+          // Status update
+          if (lowerMessage.includes('status')) {
+            const statusMatch = message.match(/status\s+(?:to\s+)?(new|contacted|qualified|proposal|negotiation|won|lost)/i)?.[1]?.toLowerCase();
+            if (statusMatch) {
+              updates.status = statusMatch;
+              fieldUpdated = `status to ${statusMatch}`;
+            }
+          }
+          
+          // Notes update
+          if (lowerMessage.includes('note')) {
+            const noteMatch = message.match(/note[s]?\s+(?:to\s+)?(.+)$/i)?.[1]?.trim();
+            if (noteMatch) {
+              updates.notes = noteMatch;
+              fieldUpdated = `notes`;
+            }
+          }
+          
+          if (Object.keys(updates).length > 0) {
+            const { error } = await supabase
+              .from('leads')
+              .update(updates)
+              .eq('id', lead.id);
             
-            // Log as agent action
-            await supabase.from('agent_actions').insert({
-              agent_type: 'voice_assistant',
-              action_type: 'lead_updated',
-              status: 'completed',
-              data: { lead_id: lead.id, field: 'email', new_value: emailMatch },
-              executed_at: new Date().toISOString()
+            if (!error) {
+              actionResults.push(`Updated ${lead.name}'s ${fieldUpdated}`);
+              actionsTaken.push({ action: 'update_lead', lead_id: lead.id, lead_name: lead.name, updates });
+              
+              // Log as agent action
+              await supabase.from('agent_actions').insert({
+                agent_type: 'voice_assistant',
+                action_type: 'lead_updated',
+                status: 'completed',
+                data: { lead_id: lead.id, updates },
+                executed_at: new Date().toISOString()
+              });
+            }
+          }
+        }
+      }
+    }
+    
+    // 15. Join meeting (prepare AI agent to join)
+    if (lowerMessage.includes('join') && lowerMessage.includes('meet')) {
+      const leadName = message.match(/(?:with|for)\s+([A-Za-z\s]+)/i)?.[1]?.trim();
+      
+      if (leadName) {
+        const { data: lead } = await supabase
+          .from('leads')
+          .select('*')
+          .ilike('name', `%${leadName}%`)
+          .single();
+        
+        if (lead) {
+          // Find the upcoming or in-progress meeting
+          const { data: meeting } = await supabase
+            .from('meetings')
+            .select('*')
+            .eq('lead_id', lead.id)
+            .in('status', ['scheduled', 'prepared'])
+            .order('scheduled_at', { ascending: false })
+            .limit(1)
+            .single();
+          
+          if (meeting) {
+            // Prepare the AI agent to join
+            const { error: prepError } = await supabase.functions.invoke('meeting-voice-agent', {
+              body: {
+                action: 'prepare',
+                meetingId: meeting.id
+              }
             });
+            
+            if (!prepError) {
+              // Update meeting status to prepared
+              await supabase
+                .from('meetings')
+                .update({ status: 'prepared' })
+                .eq('id', meeting.id);
+              
+              actionResults.push(`AI agent prepared to join meeting with ${lead.name}. The agent will automatically join at the scheduled time.`);
+              actionsTaken.push({ action: 'prepare_meeting', meeting_id: meeting.id, lead_name: lead.name });
+              
+              await supabase.from('agent_actions').insert({
+                agent_type: 'voice_assistant',
+                action_type: 'meeting_prepared',
+                status: 'completed',
+                data: { meeting_id: meeting.id, lead_id: lead.id },
+                executed_at: new Date().toISOString()
+              });
+            }
+          } else {
+            actionResults.push(`No upcoming meeting found with ${lead.name}. Would you like me to schedule one?`);
           }
         }
       }
@@ -517,11 +625,14 @@ IMPORTANT CAPABILITIES:
 - You can SEND emails after voice approval
 - You can FIND and SEARCH leads
 - You can ADD new leads to the system
+- You can UPDATE lead details (email, phone, company, status, notes)
 - You can REVIEW email replies from leads
 - You can APPROVE and SEND reply emails
 - You can APPROVE follow-up emails in bulk
 - You can RUN background agents (follow-up, lead scoring, pipeline)
 - You can SHOW agent activity and status
+- You can SCHEDULE meetings with leads
+- You can PREPARE AI agent to join meetings (the AI will automatically join at the scheduled time)
 
 When actions are performed, you'll see [ACTIONS COMPLETED] in the context - acknowledge what was done.
 Always be proactive in suggesting and executing actions.

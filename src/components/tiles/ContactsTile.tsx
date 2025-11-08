@@ -1,6 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Contact {
@@ -13,6 +14,7 @@ interface Contact {
 }
 
 const ContactsTile = () => {
+  const navigate = useNavigate();
   const [contacts, setContacts] = useState<Contact[]>([]);
 
   useEffect(() => {
@@ -68,6 +70,7 @@ const ContactsTile = () => {
           contacts.map((contact) => (
             <Card
               key={contact.id}
+              onClick={() => navigate(`/lead/${contact.id}`)}
               className="p-3 bg-white/60 border-white/40 hover:bg-white/80 transition-all cursor-pointer"
             >
               <div className="flex items-center justify-between gap-3">
