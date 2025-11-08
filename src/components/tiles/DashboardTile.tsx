@@ -1,21 +1,41 @@
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { TrendingUp, Users, Calendar, DollarSign } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 const DashboardTile = () => {
-  const kpis = [
-    { label: "Total Leads / Contacts", value: "1,234", icon: Users, color: "text-primary" },
-    { label: "Active Deals", value: "42", icon: TrendingUp, color: "text-success" },
-    { label: "Upcoming Follow-ups", value: "18", icon: Calendar, color: "text-warning" },
-    { label: "Revenue Pipeline", value: "$487K", icon: DollarSign, color: "text-primary" },
-  ];
+  const [stats, setStats] = useState({
+    totalLeads: 0,
+    activeDeals: 0,
+    upcomingFollowups: 0,
+    emailsSent: 0
+  });
 
-  const activities = [
-    { type: "Email", contact: "Alice Johnson", time: "10 mins ago" },
-    { type: "Call", contact: "Bob Smith", time: "1 hour ago" },
-    { type: "Note", contact: "Carol White", time: "2 hours ago" },
-    { type: "Meeting", contact: "David Brown", time: "3 hours ago" },
-    { type: "Email", contact: "Eve Wilson", time: "5 hours ago" },
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const fetchStats = async () => {
+    const [leadsRes, dealsRes, followupsRes, emailsRes] = await Promise.all([
+      supabase.from('leads').select('id', { count: 'exact', head: true }),
+      supabase.from('leads').select('id', { count: 'exact', head: true }).in('status', ['qualified', 'proposal', 'negotiation']),
+      supabase.from('leads').select('id', { count: 'exact', head: true }).not('next_followup_at', 'is', null),
+      supabase.from('email_campaigns').select('id', { count: 'exact', head: true }).not('sent_at', 'is', null)
+    ]);
+
+    setStats({
+      totalLeads: leadsRes.count || 0,
+      activeDeals: dealsRes.count || 0,
+      upcomingFollowups: followupsRes.count || 0,
+      emailsSent: emailsRes.count || 0
+    });
+  };
+
+  const kpis = [
+    { label: "Total Leads / Contacts", value: stats.totalLeads.toString(), icon: Users, color: "text-primary" },
+    { label: "Active Deals", value: stats.activeDeals.toString(), icon: TrendingUp, color: "text-success" },
+    { label: "Upcoming Follow-ups", value: stats.upcomingFollowups.toString(), icon: Calendar, color: "text-warning" },
+    { label: "Emails Sent", value: stats.emailsSent.toString(), icon: DollarSign, color: "text-primary" },
   ];
 
   return (

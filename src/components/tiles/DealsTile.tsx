@@ -1,30 +1,52 @@
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Deal {
-  id: number;
+  id: string;
   name: string;
-  stage: string;
-  value: string;
-  closeDate: string;
+  company: string | null;
+  status: string;
+  lead_score: number;
 }
 
 const DealsTile = () => {
-  const deals: Deal[] = [
-    { id: 1, name: "Enterprise License Deal", stage: "Negotiation", value: "$120K", closeDate: "2025-11-20" },
-    { id: 2, name: "SaaS Subscription", stage: "Proposal", value: "$45K", closeDate: "2025-11-15" },
-    { id: 3, name: "Consulting Package", stage: "Discovery", value: "$78K", closeDate: "2025-12-01" },
-    { id: 4, name: "Integration Services", stage: "Proposal", value: "$34K", closeDate: "2025-11-18" },
-    { id: 5, name: "Custom Development", stage: "Negotiation", value: "$156K", closeDate: "2025-11-25" },
-  ];
+  const [deals, setDeals] = useState<Deal[]>([]);
+
+  useEffect(() => {
+    fetchDeals();
+
+    const channel = supabase
+      .channel('deals-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => {
+        fetchDeals();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const fetchDeals = async () => {
+    const { data } = await supabase
+      .from('leads')
+      .select('id, name, company, status, lead_score')
+      .in('status', ['qualified', 'proposal', 'negotiation'])
+      .order('lead_score', { ascending: false })
+      .limit(3);
+
+    setDeals(data || []);
+  };
 
   const getStageColor = (stage: string) => {
-    switch (stage) {
-      case "Discovery":
+    switch (stage.toLowerCase()) {
+      case "qualified":
         return "bg-secondary text-primary";
-      case "Proposal":
+      case "proposal":
         return "bg-warning/10 text-warning";
-      case "Negotiation":
+      case "negotiation":
         return "bg-success/10 text-success";
       default:
         return "bg-muted";
@@ -35,24 +57,23 @@ const DealsTile = () => {
     <div className="glass-tile gradient-deals p-4 hover-scale h-full flex flex-col">
       <h2 className="text-lg font-semibold mb-3">Deals</h2>
       
-      <div className="space-y-2 overflow-auto custom-scrollbar flex-1">
-        {deals.slice(0, 3).map((deal) => (
-          <Card
-            key={deal.id}
-            className="p-3 bg-white/60 border-white/40 hover:bg-white/80 transition-all"
-          >
-            <div className="flex justify-between items-start gap-2">
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm mb-1 truncate">{deal.name}</h3>
-                <Badge className={`${getStageColor(deal.stage)} text-xs`}>
-                  {deal.stage}
-                </Badge>
+      <div className="space-y-3">
+        {deals.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">No active deals</p>
+        ) : deals.map((deal) => (
+          <Card key={deal.id} className="p-3 hover:shadow-md transition-shadow">
+            <div className="flex items-start justify-between mb-2">
+              <div>
+                <h4 className="font-medium text-sm">{deal.name}</h4>
+                <p className="text-xs text-muted-foreground">{deal.company || 'No company'}</p>
               </div>
-              <div className="text-right">
-                <p className="text-lg font-bold text-primary">{deal.value}</p>
-                <p className="text-xs text-muted-foreground whitespace-nowrap">{deal.closeDate}</p>
-              </div>
+              <Badge className={getStageColor(deal.status)}>
+                {deal.status}
+              </Badge>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Score: {deal.lead_score}/100
+            </p>
           </Card>
         ))}
       </div>
