@@ -27,11 +27,13 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Fetch relevant data from database
-    const [leadsData, campaignsData, meetingsData, actionsData] = await Promise.all([
+    const [leadsData, campaignsData, meetingsData, actionsData, emailRepliesData, agentRunsData] = await Promise.all([
       supabase.from('leads').select('*').order('lead_score', { ascending: false }).limit(20),
       supabase.from('email_campaigns').select('*, leads(name, company)').order('created_at', { ascending: false }).limit(10),
       supabase.from('meetings').select('*, leads(name, company)').order('scheduled_at', { ascending: false }).limit(10),
-      supabase.from('agent_actions').select('*').eq('status', 'pending').limit(5)
+      supabase.from('agent_actions').select('*').eq('status', 'pending').limit(5),
+      supabase.from('email_replies').select('*, leads(name, company)').eq('status', 'pending').order('replied_at', { ascending: false }).limit(5),
+      supabase.from('agent_runs').select('*').order('started_at', { ascending: false }).limit(5)
     ]);
 
     // Detect and execute action items
@@ -189,6 +191,134 @@ serve(async (req) => {
         }
       }
     }
+    
+    // 8. Review email replies
+    if (lowerMessage.includes('review') && (lowerMessage.includes('reply') || lowerMessage.includes('replies') || lowerMessage.includes('email'))) {
+      const { data: pendingReplies } = await supabase
+        .from('email_replies')
+        .select('*, leads(name, company)')
+        .eq('status', 'pending')
+        .eq('requires_manager_review', true)
+        .order('replied_at', { ascending: false })
+        .limit(3);
+      
+      if (pendingReplies && pendingReplies.length > 0) {
+        actionResults.push(`Found ${pendingReplies.length} email reply(ies) waiting for review`);
+      } else {
+        actionResults.push('No email replies pending review');
+      }
+    }
+    
+    // 9. Approve email reply
+    if (lowerMessage.includes('approve') && lowerMessage.includes('reply')) {
+      const leadName = message.match(/(?:to|for|from)\s+([A-Za-z\s]+)/i)?.[1]?.trim();
+      
+      if (leadName) {
+        const { data: lead } = await supabase
+          .from('leads')
+          .select('*')
+          .ilike('name', `%${leadName}%`)
+          .single();
+        
+        if (lead) {
+          const { data: reply } = await supabase
+            .from('email_replies')
+            .select('*')
+            .eq('lead_id', lead.id)
+            .eq('status', 'pending')
+            .order('replied_at', { ascending: false })
+            .limit(1)
+            .single();
+          
+          if (reply) {
+            // Update reply status
+            await supabase
+              .from('email_replies')
+              .update({ 
+                status: 'approved',
+                reviewed_at: new Date().toISOString()
+              })
+              .eq('id', reply.id);
+            
+            // Send the reply via email
+            const { error: sendError } = await supabase.functions.invoke('send-email', {
+              body: {
+                to: lead.email,
+                subject: `Re: Previous conversation`,
+                body: reply.draft_response
+              }
+            });
+            
+            if (!sendError) {
+              actionResults.push(`Email reply to ${lead.name} approved and sent`);
+            }
+          }
+        }
+      }
+    }
+    
+    // 10. Approve follow-up emails
+    if (lowerMessage.includes('approve') && lowerMessage.includes('follow')) {
+      const { data: followupActions } = await supabase
+        .from('agent_actions')
+        .select('*')
+        .eq('action_type', 'followup_email_approval')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(5);
+      
+      if (followupActions && followupActions.length > 0) {
+        for (const action of followupActions) {
+          // Update action status
+          await supabase
+            .from('agent_actions')
+            .update({ 
+              status: 'approved',
+              approved_at: new Date().toISOString()
+            })
+            .eq('id', action.id);
+          
+          // Send the follow-up email
+          const campaignId = action.data.campaign_id;
+          await supabase.functions.invoke('send-email', {
+            body: { campaignId }
+          });
+        }
+        actionResults.push(`Approved and sent ${followupActions.length} follow-up email(s)`);
+      } else {
+        actionResults.push('No follow-up emails pending approval');
+      }
+    }
+    
+    // 11. Run background agents
+    if (lowerMessage.includes('run agent') || lowerMessage.includes('start agent')) {
+      const agentType = lowerMessage.includes('follow') ? 'follow_up' : 
+                       lowerMessage.includes('scoring') ? 'lead_scoring' : 
+                       lowerMessage.includes('pipeline') ? 'deal_pipeline' : null;
+      
+      if (agentType === 'follow_up') {
+        await supabase.functions.invoke('auto-followup-scheduler', {});
+        actionResults.push('Follow-up agent started');
+      } else {
+        await supabase.functions.invoke('agent-orchestrator', {
+          body: { agentType }
+        });
+        actionResults.push('Background agents started');
+      }
+    }
+    
+    // 12. Show agent activity
+    if (lowerMessage.includes('agent') && (lowerMessage.includes('activity') || lowerMessage.includes('status') || lowerMessage.includes('working'))) {
+      const { data: recentRuns } = await supabase
+        .from('agent_runs')
+        .select('*')
+        .order('started_at', { ascending: false })
+        .limit(3);
+      
+      if (recentRuns && recentRuns.length > 0) {
+        actionResults.push(`${recentRuns.length} recent agent runs found`);
+      }
+    }
 
     // Build context with actual data
     const dataContext = `
@@ -221,6 +351,21 @@ PENDING ACTIONS (${actionsData.data?.length || 0}):
 ${actionsData.data?.map(a => 
   `- ${a.action_type} (${a.agent_type}): ${a.status}`
 ).join('\n') || 'No pending actions'}
+
+EMAIL REPLIES (${emailRepliesData.data?.length || 0} pending review):
+${emailRepliesData.data?.map(r => 
+  `- From: ${r.leads?.name} (${r.leads?.company})
+    Sentiment: ${r.sentiment_score}
+    Replied: ${r.replied_at}
+    Draft response ready: ${r.draft_response ? 'Yes' : 'No'}`
+).join('\n') || 'No email replies pending'}
+
+AGENT ACTIVITY (${agentRunsData.data?.length || 0} recent runs):
+${agentRunsData.data?.map(a => 
+  `- ${a.agent_type}: ${a.status}
+    Started: ${a.started_at}
+    ${a.actions_taken ? `Actions: ${JSON.stringify(a.actions_taken).slice(0, 100)}...` : ''}`
+).join('\n') || 'No recent agent activity'}
 
 ${actionResults.length > 0 ? `\n[ACTIONS COMPLETED: ${actionResults.join('; ')}]` : ''}
 `;
@@ -262,11 +407,17 @@ IMPORTANT CAPABILITIES:
 - You can SEND emails after voice approval
 - You can FIND and SEARCH leads
 - You can ADD new leads to the system
+- You can REVIEW email replies from leads
+- You can APPROVE and SEND reply emails
+- You can APPROVE follow-up emails in bulk
+- You can RUN background agents (follow-up, lead scoring, pipeline)
+- You can SHOW agent activity and status
 
 When actions are performed, you'll see [ACTIONS COMPLETED] in the context - acknowledge what was done.
 Always be proactive in suggesting and executing actions.
 Be concise, actionable, and professional. Keep responses under 2-3 sentences.
-Reference actual lead names and numbers when available.`
+Reference actual lead names and numbers when available.
+When reviewing emails, summarize sentiment and suggest approve/reject.`
             }]
           }
         })

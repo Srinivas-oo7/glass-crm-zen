@@ -14,3 +14,12 @@ verify_jwt = false
 
 [functions.send-email]
 verify_jwt = false
+
+[functions.email-reply-handler]
+verify_jwt = false
+
+[functions.auto-followup-scheduler]
+verify_jwt = false
+
+[functions.agent-orchestrator]
+verify_jwt = false

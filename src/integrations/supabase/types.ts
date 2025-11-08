@@ -53,13 +53,48 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_runs: {
+        Row: {
+          actions_taken: Json | null
+          agent_type: string
+          completed_at: string | null
+          created_at: string | null
+          errors: Json | null
+          id: string
+          started_at: string | null
+          status: string | null
+        }
+        Insert: {
+          actions_taken?: Json | null
+          agent_type: string
+          completed_at?: string | null
+          created_at?: string | null
+          errors?: Json | null
+          id?: string
+          started_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          actions_taken?: Json | null
+          agent_type?: string
+          completed_at?: string | null
+          created_at?: string | null
+          errors?: Json | null
+          id?: string
+          started_at?: string | null
+          status?: string | null
+        }
+        Relationships: []
+      }
       email_campaigns: {
         Row: {
           agent_notes: string | null
           body: string
           created_at: string | null
           draft_status: string
+          followup_sequence_number: number | null
           id: string
+          is_automated_followup: boolean | null
           lead_id: string
           manager_feedback: string | null
           scheduled_send_at: string | null
@@ -72,7 +107,9 @@ export type Database = {
           body: string
           created_at?: string | null
           draft_status?: string
+          followup_sequence_number?: number | null
           id?: string
+          is_automated_followup?: boolean | null
           lead_id: string
           manager_feedback?: string | null
           scheduled_send_at?: string | null
@@ -85,7 +122,9 @@ export type Database = {
           body?: string
           created_at?: string | null
           draft_status?: string
+          followup_sequence_number?: number | null
           id?: string
+          is_automated_followup?: boolean | null
           lead_id?: string
           manager_feedback?: string | null
           scheduled_send_at?: string | null
@@ -96,6 +135,66 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "email_campaigns_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_replies: {
+        Row: {
+          campaign_id: string | null
+          created_at: string | null
+          draft_response: string | null
+          id: string
+          lead_id: string | null
+          replied_at: string | null
+          reply_content: string
+          requires_manager_review: boolean | null
+          reviewed_at: string | null
+          sentiment_score: number | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          campaign_id?: string | null
+          created_at?: string | null
+          draft_response?: string | null
+          id?: string
+          lead_id?: string | null
+          replied_at?: string | null
+          reply_content: string
+          requires_manager_review?: boolean | null
+          reviewed_at?: string | null
+          sentiment_score?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          campaign_id?: string | null
+          created_at?: string | null
+          draft_response?: string | null
+          id?: string
+          lead_id?: string | null
+          replied_at?: string | null
+          reply_content?: string
+          requires_manager_review?: boolean | null
+          reviewed_at?: string | null
+          sentiment_score?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_replies_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "email_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_replies_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
@@ -152,6 +251,7 @@ export type Database = {
           id: string
           industry: string | null
           last_contacted_at: string | null
+          last_reply_at: string | null
           lead_score: number | null
           linkedin_url: string | null
           name: string
@@ -162,6 +262,7 @@ export type Database = {
           source: string
           status: string
           twitter_handle: string | null
+          unresponsive_days: number | null
           website: string | null
         }
         Insert: {
@@ -171,6 +272,7 @@ export type Database = {
           id?: string
           industry?: string | null
           last_contacted_at?: string | null
+          last_reply_at?: string | null
           lead_score?: number | null
           linkedin_url?: string | null
           name: string
@@ -181,6 +283,7 @@ export type Database = {
           source: string
           status?: string
           twitter_handle?: string | null
+          unresponsive_days?: number | null
           website?: string | null
         }
         Update: {
@@ -190,6 +293,7 @@ export type Database = {
           id?: string
           industry?: string | null
           last_contacted_at?: string | null
+          last_reply_at?: string | null
           lead_score?: number | null
           linkedin_url?: string | null
           name?: string
@@ -200,6 +304,7 @@ export type Database = {
           source?: string
           status?: string
           twitter_handle?: string | null
+          unresponsive_days?: number | null
           website?: string | null
         }
         Relationships: []
@@ -237,13 +342,19 @@ export type Database = {
       meetings: {
         Row: {
           agent_joined_at: string | null
+          agent_notes: string | null
+          ai_agent_confidence_score: number | null
+          conversation_summary: string | null
           created_at: string | null
           google_meet_link: string | null
           id: string
           lead_id: string
+          manager_alert_reason: string | null
+          manager_alert_triggered: boolean | null
           manager_joined_at: string | null
           meeting_duration: number | null
           outcome: string | null
+          real_time_transcript: Json | null
           scheduled_at: string
           sentiment_analysis: Json | null
           status: string
@@ -253,13 +364,19 @@ export type Database = {
         }
         Insert: {
           agent_joined_at?: string | null
+          agent_notes?: string | null
+          ai_agent_confidence_score?: number | null
+          conversation_summary?: string | null
           created_at?: string | null
           google_meet_link?: string | null
           id?: string
           lead_id: string
+          manager_alert_reason?: string | null
+          manager_alert_triggered?: boolean | null
           manager_joined_at?: string | null
           meeting_duration?: number | null
           outcome?: string | null
+          real_time_transcript?: Json | null
           scheduled_at: string
           sentiment_analysis?: Json | null
           status?: string
@@ -269,13 +386,19 @@ export type Database = {
         }
         Update: {
           agent_joined_at?: string | null
+          agent_notes?: string | null
+          ai_agent_confidence_score?: number | null
+          conversation_summary?: string | null
           created_at?: string | null
           google_meet_link?: string | null
           id?: string
           lead_id?: string
+          manager_alert_reason?: string | null
+          manager_alert_triggered?: boolean | null
           manager_joined_at?: string | null
           meeting_duration?: number | null
           outcome?: string | null
+          real_time_transcript?: Json | null
           scheduled_at?: string
           sentiment_analysis?: Json | null
           status?: string
