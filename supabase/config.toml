@@ -1,1 +1,16 @@
 project_id = "lxnsgbwscjwhcjvmyqim"
+
+[functions]
+enabled = true
+
+[functions.voice-assistant]
+verify_jwt = false
+
+[functions.generate-leads]
+verify_jwt = false
+
+[functions.draft-email]
+verify_jwt = false
+
+[functions.send-email]
+verify_jwt = false
