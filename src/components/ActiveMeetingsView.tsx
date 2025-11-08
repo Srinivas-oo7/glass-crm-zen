@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Video, Bot, User, AlertTriangle, Loader2 } from "lucide-react";
+import { Video, Bot, User, AlertTriangle, Loader2, ExternalLink } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 
 interface ActiveMeeting {
@@ -18,6 +18,7 @@ interface ActiveMeeting {
   manager_alert_triggered: boolean;
   manager_alert_reason: string | null;
   conversation_summary: string | null;
+  google_meet_link: string | null;
   leads: {
     name: string;
     company: string | null;
@@ -183,6 +184,20 @@ const ActiveMeetingsView = () => {
             <div className="bg-muted/30 rounded-lg p-3 mb-3">
               <p className="text-xs font-semibold text-muted-foreground mb-1">Summary:</p>
               <p className="text-sm">{meeting.conversation_summary}</p>
+            </div>
+          )}
+
+          {meeting.google_meet_link && (
+            <div className="mb-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(meeting.google_meet_link!, '_blank')}
+                className="w-full"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Open Meeting Link
+              </Button>
             </div>
           )}
 

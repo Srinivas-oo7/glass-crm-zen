@@ -4,8 +4,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Mail, Phone, Building2, Calendar, MessageSquare, TrendingUp } from "lucide-react";
+import { ArrowLeft, Mail, Phone, Building2, Calendar, MessageSquare, TrendingUp, Edit3 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import LeadEditDialog from "@/components/LeadEditDialog";
 
 interface Lead {
   id: string;
@@ -51,6 +52,7 @@ const LeadDetails = () => {
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editOpen, setEditOpen] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -145,6 +147,10 @@ const LeadDetails = () => {
           <Button variant="ghost" onClick={() => navigate('/')}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Dashboard
+          </Button>
+          <Button onClick={() => setEditOpen(true)}>
+            <Edit3 className="mr-2 h-4 w-4" />
+            Edit Lead
           </Button>
         </div>
 
@@ -303,6 +309,15 @@ const LeadDetails = () => {
           </CardContent>
         </Card>
       </div>
+
+      {lead && (
+        <LeadEditDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          lead={lead}
+          onSaved={fetchLeadDetails}
+        />
+      )}
     </div>
   );
 };

@@ -64,7 +64,8 @@ const MeetingScheduler = ({ open, onOpenChange }: MeetingSchedulerProps) => {
         lead_id: selectedLeadId,
         title: title.trim(),
         scheduled_at: scheduledAt,
-        status: 'scheduled'
+        status: 'scheduled',
+        google_meet_link: `https://meet.google.com/new`
       });
 
       if (error) throw error;

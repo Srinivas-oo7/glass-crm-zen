@@ -1,6 +1,7 @@
+import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Settings, Plus, Mail, Calendar } from "lucide-react";
+import { Settings, Plus, Mail, Calendar, Play } from "lucide-react";
 
 interface TopNavProps {
   onSettingsClick: () => void;
@@ -10,6 +11,8 @@ interface TopNavProps {
 }
 
 const TopNav = ({ onSettingsClick, onAddLeadClick, onEmailsClick, onScheduleClick }: TopNavProps) => {
+  const navigate = useNavigate();
+  
   return (
     <nav className="glass-tile sticky top-4 mx-4 mb-6 z-50">
       <div className="px-6 py-4 flex items-center justify-between">
@@ -45,6 +48,16 @@ const TopNav = ({ onSettingsClick, onAddLeadClick, onEmailsClick, onScheduleClic
             title="Schedule Meeting"
           >
             <Calendar className="h-5 w-5" />
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate('/simulate')}
+            className="rounded-full"
+            title="Run Meeting Simulation"
+          >
+            <Play className="h-4 w-4 mr-2" />
+            Simulate
           </Button>
           <Button
             variant="ghost"

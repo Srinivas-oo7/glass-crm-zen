@@ -363,7 +363,8 @@ serve(async (req) => {
             title: `Follow-up meeting with ${lead.name}`,
             lead_id: lead.id,
             scheduled_at: scheduledTime.toISOString(),
-            status: 'scheduled'
+            status: 'scheduled',
+            google_meet_link: `https://meet.google.com/${Date.now()}`
           }).select().single();
           
           if (!error && meeting) {
