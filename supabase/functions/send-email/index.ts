@@ -12,8 +12,10 @@ serve(async (req) => {
   }
 
   try {
-    const { campaignId } = await req.json();
+    const { campaignId, to, subject, body } = await req.json();
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    
+    console.log('Send email function called with:', { campaignId, to, subject: subject ? 'provided' : 'from campaign' });
     
     if (!resendApiKey) {
       throw new Error('RESEND_API_KEY not configured');
@@ -24,20 +26,44 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get campaign and lead info
-    const { data: campaign, error: campaignError } = await supabase
-      .from('email_campaigns')
-      .select('*, leads(*)')
-      .eq('id', campaignId)
-      .single();
+    let emailTo: string;
+    let emailSubject: string;
+    let emailBody: string;
+    let leadId: string | null = null;
 
-    if (campaignError) throw campaignError;
+    // If campaignId is provided, use campaign data
+    if (campaignId) {
+      const { data: campaign, error: campaignError } = await supabase
+        .from('email_campaigns')
+        .select('*, leads(*)')
+        .eq('id', campaignId)
+        .single();
 
-    if (!campaign.leads?.email) {
-      throw new Error('Lead email not found');
+      if (campaignError) {
+        console.error('Campaign fetch error:', campaignError);
+        throw new Error(`Campaign not found: ${campaignError.message}`);
+      }
+
+      if (!campaign.leads?.email) {
+        throw new Error('Lead email not found in campaign');
+      }
+
+      emailTo = campaign.leads.email;
+      emailSubject = campaign.subject;
+      emailBody = campaign.body;
+      leadId = campaign.lead_id;
+
+      console.log('Sending campaign email to:', emailTo);
+    } else {
+      // Direct email sending
+      if (!to || !subject || !body) {
+        throw new Error('Missing required fields: to, subject, body');
+      }
+      emailTo = to;
+      emailSubject = subject;
+      emailBody = body;
+      console.log('Sending direct email to:', emailTo);
     }
-
-    console.log('Sending email to:', campaign.leads.email);
 
     // Send email with Resend
     const emailResponse = await fetch('https://api.resend.com/emails', {
@@ -47,55 +73,72 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: 'Sales Assistant <onboarding@resend.dev>',
-        to: [campaign.leads.email],
-        subject: campaign.subject,
-        html: campaign.body.replace(/\n/g, '<br>')
+        from: 'CRM Assistant <onboarding@resend.dev>',
+        to: [emailTo],
+        subject: emailSubject,
+        html: emailBody.replace(/\n/g, '<br>')
       })
     });
 
     if (!emailResponse.ok) {
-      const error = await emailResponse.text();
-      throw new Error(`Failed to send email: ${error}`);
+      const errorText = await emailResponse.text();
+      console.error('Resend API error:', errorText);
+      throw new Error(`Failed to send email: ${errorText}`);
     }
 
     const emailData = await emailResponse.json();
+    console.log('Email sent successfully via Resend:', emailData.id);
 
-    // Update campaign status
-    await supabase
-      .from('email_campaigns')
-      .update({
-        draft_status: 'sent',
-        sent_at: new Date().toISOString()
-      })
-      .eq('id', campaignId);
+    // Update campaign status if this was a campaign email
+    if (campaignId) {
+      await supabase
+        .from('email_campaigns')
+        .update({
+          draft_status: 'sent',
+          sent_at: new Date().toISOString()
+        })
+        .eq('id', campaignId);
 
-    // Update lead status
-    await supabase
-      .from('leads')
-      .update({
-        status: 'contacted',
-        last_contacted_at: new Date().toISOString()
-      })
-      .eq('id', campaign.lead_id);
+      console.log('Campaign status updated to sent');
+    }
 
-    // Create tracking record
-    await supabase
-      .from('email_tracking')
-      .insert({
-        campaign_id: campaignId
-      });
+    // Update lead status if leadId exists
+    if (leadId) {
+      await supabase
+        .from('leads')
+        .update({
+          status: 'contacted',
+          last_contacted_at: new Date().toISOString()
+        })
+        .eq('id', leadId);
 
-    console.log('Email sent successfully:', emailData.id);
+      console.log('Lead status updated to contacted');
+    }
+
+    // Create tracking record if campaign exists
+    if (campaignId) {
+      await supabase
+        .from('email_tracking')
+        .insert({
+          campaign_id: campaignId
+        });
+
+      console.log('Email tracking record created');
+    }
 
     return new Response(
       JSON.stringify({ success: true, emailId: emailData.id }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Send email error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    console.error('Error details:', errorMessage);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      JSON.stringify({ 
+        error: errorMessage,
+        details: error instanceof Error ? error.stack : undefined
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

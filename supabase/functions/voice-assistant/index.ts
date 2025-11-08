@@ -124,8 +124,23 @@ serve(async (req) => {
             body: { leadId: lead.id, context: message }
           });
           
-          if (!draftError && campaignData) {
+          if (draftError) {
+            console.error('Draft email invoke error:', draftError);
+            actionResults.push(`Failed to draft email: ${draftError.message}`);
+          } else if (campaignData?.error) {
+            console.error('Draft email function error:', campaignData.error);
+            actionResults.push(`Failed to draft email: ${campaignData.error}`);
+          } else if (campaignData?.success) {
             actionResults.push(`Email draft created for ${lead.name}. Say "approve and send email to ${lead.name}" to send it.`);
+            actionsTaken.push({ action: 'draft_email', lead_id: lead.id, campaign_id: campaignData.campaign?.id });
+            
+            await supabase.from('agent_actions').insert({
+              agent_type: 'voice_assistant',
+              action_type: 'email_drafted',
+              status: 'completed',
+              data: { lead_id: lead.id, campaign_id: campaignData.campaign?.id },
+              executed_at: new Date().toISOString()
+            });
           }
         }
       }
@@ -155,12 +170,27 @@ serve(async (req) => {
           if (campaign) {
             await supabase.from('email_campaigns').update({ draft_status: 'approved' }).eq('id', campaign.id);
             
-            const { error: sendError } = await supabase.functions.invoke('send-email', {
+            const { data: sendData, error: sendError } = await supabase.functions.invoke('send-email', {
               body: { campaignId: campaign.id }
             });
             
-            if (!sendError) {
+            if (sendError) {
+              console.error('Send email invoke error:', sendError);
+              actionResults.push(`Failed to send email: ${sendError.message}`);
+            } else if (sendData?.error) {
+              console.error('Send email function error:', sendData.error);
+              actionResults.push(`Failed to send email: ${sendData.error}`);
+            } else if (sendData?.success) {
               actionResults.push(`Email sent to ${lead.name} successfully`);
+              actionsTaken.push({ action: 'send_email', lead_id: lead.id, campaign_id: campaign.id });
+              
+              await supabase.from('agent_actions').insert({
+                agent_type: 'voice_assistant',
+                action_type: 'email_sent',
+                status: 'completed',
+                data: { lead_id: lead.id, campaign_id: campaign.id },
+                executed_at: new Date().toISOString()
+              });
             }
           }
         }
@@ -495,14 +525,20 @@ serve(async (req) => {
           
           if (meeting) {
             // Prepare the AI agent to join
-            const { error: prepError } = await supabase.functions.invoke('meeting-voice-agent', {
+            const { data: prepData, error: prepError } = await supabase.functions.invoke('meeting-voice-agent', {
               body: {
                 action: 'prepare',
                 meetingId: meeting.id
               }
             });
             
-            if (!prepError) {
+            if (prepError) {
+              console.error('Meeting prep invoke error:', prepError);
+              actionResults.push(`Failed to prepare AI agent: ${prepError.message}`);
+            } else if (prepData?.error) {
+              console.error('Meeting prep function error:', prepData.error);
+              actionResults.push(`Failed to prepare AI agent: ${prepData.error}`);
+            } else if (prepData?.success) {
               // Update meeting status to prepared
               await supabase
                 .from('meetings')

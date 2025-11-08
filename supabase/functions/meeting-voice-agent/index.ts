@@ -13,16 +13,20 @@ serve(async (req) => {
 
   try {
     const { meetingId, action } = await req.json();
+    
+    console.log('Meeting voice agent called with action:', action, 'meetingId:', meetingId);
+    
     const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     if (!geminiApiKey) {
+      console.error('GEMINI_API_KEY not configured');
       throw new Error('GEMINI_API_KEY not configured');
     }
 
-    console.log('Meeting voice agent action:', action, 'for meeting:', meetingId);
+    console.log('Meeting voice agent processing action:', action);
 
     // Fetch meeting details
     const { data: meeting, error: meetingError } = await supabase
@@ -300,9 +304,14 @@ ${transcript}`
         throw new Error('Invalid action');
     }
   } catch (error) {
-    console.error('Error in meeting voice agent:', error);
+    console.error('Meeting voice agent error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    console.error('Error details:', errorMessage);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      JSON.stringify({ 
+        error: errorMessage,
+        details: error instanceof Error ? error.stack : undefined
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
