@@ -108,12 +108,12 @@ const SettingsModal = ({ open, onOpenChange }: SettingsModalProps) => {
           <div className="space-y-3">
             <Label>AI Model Settings</Label>
             <div className="p-4 bg-muted/50 rounded-xl space-y-2">
-              <p className="text-sm text-muted-foreground">
-                AI assistant powered by Google Gemini 2.0 Flash
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Connected via your Gemini API key
-              </p>
+      <p className="text-sm text-muted-foreground">
+        AI assistant powered by Gemini 1.5 Flash
+      </p>
+      <p className="text-xs text-muted-foreground">
+        Connected via Google AI Studio API key
+      </p>
             </div>
           </div>
 
