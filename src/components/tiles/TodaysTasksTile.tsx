@@ -38,23 +38,23 @@ const TodaysTasksTile = () => {
   };
 
   return (
-    <div className="glass-tile gradient-ai p-4 hover-scale h-full flex flex-col">
-      <h2 className="text-lg font-semibold mb-3">Today's Tasks</h2>
+    <div className="glass-tile gradient-ai p-4 hover-scale h-full flex flex-col overflow-hidden">
+      <h2 className="text-base font-semibold mb-2">Today's Tasks</h2>
       
-      <div className="space-y-2 overflow-auto custom-scrollbar flex-1">
+      <div className="overflow-auto custom-scrollbar flex-1 space-y-2">
         {tasks.map((task) => (
           <Card
             key={task.id}
-            className={`p-3 bg-white/60 border-white/40 border-l-4 ${getPriorityColor(task.priority)} hover:bg-white/80 transition-all cursor-pointer`}
+            className={`p-2 bg-white/60 border-white/40 border-l-4 ${getPriorityColor(task.priority)} hover:bg-white/80 transition-all cursor-pointer`}
             onClick={() => toggleTask(task.id)}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               {task.completed ? (
-                <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
+                <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
               ) : (
-                <Circle className="h-5 w-5 text-muted-foreground shrink-0" />
+                <Circle className="h-4 w-4 text-muted-foreground shrink-0" />
               )}
-              <p className={`text-sm flex-1 ${task.completed ? "line-through text-muted-foreground" : ""}`}>
+              <p className={`text-xs flex-1 ${task.completed ? "line-through text-muted-foreground" : ""}`}>
                 {task.text}
               </p>
             </div>
@@ -62,10 +62,10 @@ const TodaysTasksTile = () => {
         ))}
       </div>
 
-      <div className="mt-3 pt-3 border-t border-white/30">
+      <div className="mt-2 pt-2 border-t border-white/30 shrink-0">
         <div className="flex justify-between text-xs text-muted-foreground">
-          <span>{tasks.filter(t => t.completed).length} of {tasks.length} completed</span>
-          <span>{tasks.filter(t => !t.completed && t.priority === "high").length} high priority</span>
+          <span>{tasks.filter(t => t.completed).length}/{tasks.length}</span>
+          <span>{tasks.filter(t => !t.completed && t.priority === "high").length} high</span>
         </div>
       </div>
     </div>

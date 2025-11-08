@@ -32,24 +32,24 @@ const DealsTile = () => {
   };
 
   return (
-    <div className="glass-tile gradient-deals p-4 hover-scale h-full flex flex-col">
-      <h2 className="text-lg font-semibold mb-3">Deals</h2>
+    <div className="glass-tile gradient-deals p-4 hover-scale h-full flex flex-col overflow-hidden">
+      <h2 className="text-base font-semibold mb-2">Deals</h2>
       
-      <div className="space-y-2 overflow-auto custom-scrollbar flex-1">
-        {deals.slice(0, 3).map((deal) => (
+      <div className="overflow-auto custom-scrollbar flex-1 space-y-2">
+        {deals.map((deal) => (
           <Card
             key={deal.id}
-            className="p-3 bg-white/60 border-white/40 hover:bg-white/80 transition-all"
+            className="p-2 bg-white/60 border-white/40 hover:bg-white/80 transition-all"
           >
             <div className="flex justify-between items-start gap-2">
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-sm mb-1 truncate">{deal.name}</h3>
+                <h3 className="font-semibold text-xs mb-1 truncate">{deal.name}</h3>
                 <Badge className={`${getStageColor(deal.stage)} text-xs`}>
                   {deal.stage}
                 </Badge>
               </div>
-              <div className="text-right">
-                <p className="text-lg font-bold text-primary">{deal.value}</p>
+              <div className="text-right shrink-0">
+                <p className="text-sm font-bold text-primary">{deal.value}</p>
                 <p className="text-xs text-muted-foreground whitespace-nowrap">{deal.closeDate}</p>
               </div>
             </div>

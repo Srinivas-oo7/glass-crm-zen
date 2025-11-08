@@ -13,11 +13,11 @@ const Index = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
-    <div className="min-h-screen pb-6">
+    <div className="h-screen overflow-hidden flex flex-col pb-6">
       <TopNav onSettingsClick={() => setSettingsOpen(true)} />
       
-      <main className="px-4 max-w-[1800px] mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 h-[calc(100vh-140px)]">
+      <main className="flex-1 px-4 max-w-[1800px] mx-auto w-full overflow-hidden">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 h-full">
           <div className="lg:col-span-2 lg:row-span-2">
             <DashboardTile />
           </div>

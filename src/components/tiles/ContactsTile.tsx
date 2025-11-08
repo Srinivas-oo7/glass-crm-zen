@@ -34,24 +34,24 @@ const ContactsTile = () => {
   };
 
   return (
-    <div className="glass-tile gradient-contacts p-4 hover-scale h-full flex flex-col">
-      <h2 className="text-lg font-semibold mb-3">Contacts</h2>
+    <div className="glass-tile gradient-contacts p-4 hover-scale h-full flex flex-col overflow-hidden">
+      <h2 className="text-base font-semibold mb-2">Contacts</h2>
       
-      <div className="space-y-2 overflow-auto custom-scrollbar flex-1">
-        {contacts.slice(0, 4).map((contact) => (
+      <div className="overflow-auto custom-scrollbar flex-1 space-y-2">
+        {contacts.map((contact) => (
           <Card
             key={contact.id}
-            className="p-3 bg-white/60 border-white/40 hover:bg-white/80 transition-all cursor-pointer"
+            className="p-2 bg-white/60 border-white/40 hover:bg-white/80 transition-all cursor-pointer"
           >
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-2">
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm truncate">{contact.name}</p>
+                <p className="font-medium text-xs truncate">{contact.name}</p>
                 <p className="text-xs text-muted-foreground truncate">{contact.company}</p>
               </div>
-              <Badge className={`${getIntentColor(contact.intent)} text-xs`}>
+              <Badge className={`${getIntentColor(contact.intent)} text-xs shrink-0`}>
                 {contact.intent}
               </Badge>
-              <p className="font-semibold text-sm">{contact.dealValue}</p>
+              <p className="font-semibold text-xs shrink-0">{contact.dealValue}</p>
             </div>
           </Card>
         ))}

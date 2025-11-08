@@ -33,24 +33,24 @@ const FollowUpsTile = () => {
   };
 
   return (
-    <div className="glass-tile gradient-followups p-4 hover-scale h-full flex flex-col">
-      <h2 className="text-lg font-semibold mb-3">Follow-ups</h2>
+    <div className="glass-tile gradient-followups p-4 hover-scale h-full flex flex-col overflow-hidden">
+      <h2 className="text-base font-semibold mb-2">Follow-ups</h2>
       
-      <div className="space-y-2 overflow-auto custom-scrollbar flex-1">
-        {followUps.slice(0, 4).map((followUp) => (
+      <div className="overflow-auto custom-scrollbar flex-1 space-y-2">
+        {followUps.map((followUp) => (
           <Card
             key={followUp.id}
-            className={`p-3 bg-white/60 border-white/40 hover:bg-white/80 transition-all ${getUrgencyStyles(followUp.urgency)}`}
+            className={`p-2 bg-white/60 border-white/40 hover:bg-white/80 transition-all ${getUrgencyStyles(followUp.urgency)}`}
           >
             <div className="flex justify-between items-start mb-1">
-              <h3 className="font-semibold text-sm">{followUp.name}</h3>
+              <h3 className="font-semibold text-xs">{followUp.name}</h3>
               {followUp.urgency === "high" && (
-                <AlertCircle className="h-3 w-3 text-destructive" />
+                <AlertCircle className="h-3 w-3 text-destructive shrink-0" />
               )}
             </div>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1.5">
+            <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
               <Clock className="h-3 w-3" />
-              <span>{followUp.date} at {followUp.time}</span>
+              <span className="text-xs">{followUp.date} • {followUp.time}</span>
             </div>
             <p className="text-xs text-primary">{followUp.aiSuggestion}</p>
           </Card>
