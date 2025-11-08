@@ -3,7 +3,6 @@ import { MessageCircle, Mic, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   role: "user" | "assistant";
@@ -15,44 +14,22 @@ const AIAssistant = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "Hi! I'm your AI assistant powered by Gemini. I can help you navigate your CRM. Try asking me anything!"
+      content: "Hi! I'm your AI assistant. I can help you navigate your CRM. Try saying 'Expand Contacts tile' or 'Show deals closing this week'."
     }
   ]);
   const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  const handleSend = () => {
+    if (!input.trim()) return;
 
-    const userMessage = { role: "user" as const, content: input };
-    const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
+    const newMessages = [
+      ...messages,
+      { role: "user" as const, content: input },
+      { role: "assistant" as const, content: `I understand you want to: "${input}". This feature will be connected to Gemini AI soon!` }
+    ];
+
+    setMessages(newMessages);
     setInput("");
-    setIsLoading(true);
-
-    try {
-      const { data, error } = await supabase.functions.invoke('chat-with-gemini', {
-        body: { messages: updatedMessages }
-      });
-
-      if (error) throw error;
-
-      const assistantMessage = {
-        role: "assistant" as const,
-        content: data.response
-      };
-
-      setMessages([...updatedMessages, assistantMessage]);
-    } catch (error) {
-      console.error('Error calling Gemini:', error);
-      const errorMessage = {
-        role: "assistant" as const,
-        content: "Sorry, I encountered an error. Please try again."
-      };
-      setMessages([...updatedMessages, errorMessage]);
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   return (
@@ -117,16 +94,14 @@ const AIAssistant = () => {
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !isLoading && handleSend()}
-                placeholder={isLoading ? "Thinking..." : "Type your message..."}
+                onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                placeholder="Type your command..."
                 className="bg-white/60 border-white/40 rounded-xl"
-                disabled={isLoading}
               />
               <Button
                 onClick={handleSend}
                 size="icon"
                 className="shrink-0 rounded-full bg-primary hover:bg-primary/90"
-                disabled={isLoading}
               >
                 <Send className="h-4 w-4" />
               </Button>
