@@ -8,90 +8,76 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
+    /* MacOS Sonoma CRM Design System */
+    
+    /* Base colors - soft neutrals */
+    --background: 220 9% 96%; /* #F5F6F7 */
+    --foreground: 0 0% 12%; /* #1E1E1E */
+    
+    /* Glass tile backgrounds */
+    --card: 0 0% 100%; /* Pure white base */
+    --card-foreground: 0 0% 12%;
+    
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
-    --radius: 0.5rem;
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --popover-foreground: 0 0% 12%;
+    
+    /* Apple blue accent */
+    --primary: 211 100% 50%; /* #007AFF */
+    --primary-foreground: 0 0% 100%;
+    
+    /* Subtle secondary surfaces */
+    --secondary: 220 60% 96%; /* #D6E0FF */
+    --secondary-foreground: 0 0% 12%;
+    
+    --muted: 220 9% 93%;
+    --muted-foreground: 0 0% 29%; /* #4B4B4B */
+    
+    --accent: 211 100% 50%;
+    --accent-foreground: 0 0% 100%;
+    
+    /* Status colors */
+    --success: 142 76% 49%; /* #34C759 */
+    --warning: 48 100% 50%; /* #FFCC00 */
+    --destructive: 4 90% 58%; /* #FF3B30 */
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Borders and inputs */
+    --border: 0 0% 100% / 0.3; /* rgba(255,255,255,0.3) */
+    --input: 0 0% 100% / 0.8;
+    --ring: 211 100% 50%;
+    
+    /* Tile-specific gradients */
+    --gradient-dashboard-from: 214 100% 94%; /* #E0ECFF */
+    --gradient-dashboard-to: 210 100% 98%; /* #F7FAFF */
+    
+    --gradient-contacts-from: 158 100% 95%; /* #E3FFF5 */
+    --gradient-contacts-to: 0 0% 100%;
+    
+    --gradient-deals-from: 0 100% 96%; /* #FFE9E9 */
+    --gradient-deals-to: 0 0% 100%;
+    
+    --gradient-followups-from: 48 100% 94%; /* #FFF8E1 */
+    --gradient-followups-to: 0 0% 100%;
+    
+    --gradient-calendar-from: 218 100% 96%; /* #EAF0FF */
+    --gradient-calendar-to: 0 0% 100%;
+    
+    --gradient-ai-from: 211 100% 96%;
+    --gradient-ai-to: 0 0% 100%;
+    
+    --radius: 0.75rem; /* 12px base */
+    --radius-lg: 1.5rem; /* 24px for tiles */
+    
+    /* Glass effects */
+    --glass-bg: 0 0% 100% / 0.8;
+    --glass-border: 0 0% 100% / 0.3;
+    --shadow-glass: 0 4px 16px rgba(0, 0, 0, 0.08);
+    
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
+  
+  /* Dark mode styling removed as per requirements */
 }
 
 @layer base {
@@ -100,6 +86,60 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+  
+  /* Glassmorphism utilities */
+  .glass-tile {
+    @apply bg-white/80 backdrop-blur-xl border border-white/30 rounded-[24px] shadow-[0_4px_16px_rgba(0,0,0,0.08)];
+  }
+  
+  .hover-scale {
+    @apply transition-all duration-300 hover:scale-[1.02] hover:brightness-[1.04];
+  }
+}
+
+@layer utilities {
+  /* Tile gradient backgrounds */
+  .gradient-dashboard {
+    background: linear-gradient(135deg, hsl(var(--gradient-dashboard-from)), hsl(var(--gradient-dashboard-to)));
+  }
+  
+  .gradient-contacts {
+    background: linear-gradient(135deg, hsl(var(--gradient-contacts-from)), hsl(var(--gradient-contacts-to)));
+  }
+  
+  .gradient-deals {
+    background: linear-gradient(135deg, hsl(var(--gradient-deals-from)), hsl(var(--gradient-deals-to)));
+  }
+  
+  .gradient-followups {
+    background: linear-gradient(135deg, hsl(var(--gradient-followups-from)), hsl(var(--gradient-followups-to)));
+  }
+  
+  .gradient-calendar {
+    background: linear-gradient(135deg, hsl(var(--gradient-calendar-from)), hsl(var(--gradient-calendar-to)));
+  }
+  
+  .gradient-ai {
+    background: linear-gradient(135deg, hsl(var(--gradient-ai-from)), hsl(var(--gradient-ai-to)));
+  }
+  
+  /* Scrollbar styling */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-muted rounded-full;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/30;
   }
 }
