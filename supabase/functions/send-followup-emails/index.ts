@@ -33,9 +33,15 @@ serve(async (req) => {
       .order('next_followup_at', { ascending: true })
       .limit(10);
 
-    if (leadsError) throw leadsError;
+    if (leadsError) {
+      console.error('Error fetching leads:', leadsError);
+      throw leadsError;
+    }
 
     console.log(`Found ${leadsNeedingFollowup?.length || 0} leads needing follow-up`);
+    if (leadsNeedingFollowup && leadsNeedingFollowup.length > 0) {
+      console.log('Leads to process:', leadsNeedingFollowup.map(l => ({ id: l.id, name: l.name, next_followup_at: l.next_followup_at })));
+    }
 
     const emailsSent = [];
 
@@ -86,6 +92,8 @@ serve(async (req) => {
           throw new Error('Failed to parse email content');
         }
 
+        console.log(`Creating draft for ${lead.name} with subject: ${emailContent.subject}`);
+
         // Create email draft instead of sending
         const { data: campaignData, error: campaignError } = await supabase
           .from('email_campaigns')
@@ -101,9 +109,11 @@ serve(async (req) => {
           .single();
 
         if (campaignError) {
-          console.error('Error creating draft:', campaignError);
-          throw new Error(`Failed to create draft: ${campaignError.message}`);
+          console.error('Error creating draft for', lead.name, ':', campaignError);
+          throw campaignError;
         }
+
+        console.log(`Draft created successfully for ${lead.name}, campaign ID: ${campaignData.id}`);
 
         // Create agent action for approval
         await supabase
