@@ -44,15 +44,11 @@ serve(async (req) => {
         throw new Error(`Campaign not found: ${campaignError.message}`);
       }
 
-      if (!campaign.leads?.email) {
-        throw new Error('Lead email not found in campaign');
-      }
-
       emailSubject = campaign.subject;
       emailBody = campaign.body;
       leadId = campaign.lead_id;
 
-      console.log('Original recipient would be:', campaign.leads.email);
+      console.log('Original recipient would be:', campaign.leads?.email || 'no email in database');
     } else {
       // Direct email sending
       if (!to || !subject || !body) {
