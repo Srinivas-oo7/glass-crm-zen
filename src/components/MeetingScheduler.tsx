@@ -42,7 +42,19 @@ const MeetingScheduler = ({ open, onOpenChange }: MeetingSchedulerProps) => {
         .order('name');
 
       if (error) throw error;
-      setLeads(data || []);
+      
+      // Filter out leads with invalid or missing emails
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const validLeads = (data || []).filter(lead => 
+        lead.email && emailRegex.test(lead.email)
+      );
+      
+      setLeads(validLeads);
+      
+      // Show warning if some leads were filtered out
+      if (data && data.length > validLeads.length) {
+        console.warn(`${data.length - validLeads.length} leads excluded due to invalid email addresses`);
+      }
     } catch (error) {
       console.error('Error fetching leads:', error);
     }
@@ -53,6 +65,18 @@ const MeetingScheduler = ({ open, onOpenChange }: MeetingSchedulerProps) => {
       toast({
         title: "Error",
         description: "Please fill in all fields",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate selected lead has valid email
+    const selectedLead = leads.find(l => l.id === selectedLeadId);
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!selectedLead?.email || !emailRegex.test(selectedLead.email)) {
+      toast({
+        title: "Invalid Email",
+        description: "This lead has an invalid email address. Please update their email before scheduling a meeting.",
         variant: "destructive"
       });
       return;
