@@ -86,6 +86,80 @@ export type Database = {
         }
         Relationships: []
       }
+      company_profile: {
+        Row: {
+          company: string
+          created_at: string
+          id: string
+          industry: string | null
+          keywords: Json | null
+          target_industries: Json | null
+          target_roles: Json | null
+          updated_at: string
+        }
+        Insert: {
+          company: string
+          created_at?: string
+          id?: string
+          industry?: string | null
+          keywords?: Json | null
+          target_industries?: Json | null
+          target_roles?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          company?: string
+          created_at?: string
+          id?: string
+          industry?: string | null
+          keywords?: Json | null
+          target_industries?: Json | null
+          target_roles?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      deals: {
+        Row: {
+          close_date: string | null
+          created_at: string
+          id: string
+          lead_id: string | null
+          name: string
+          stage: string
+          updated_at: string
+          value: number | null
+        }
+        Insert: {
+          close_date?: string | null
+          created_at?: string
+          id?: string
+          lead_id?: string | null
+          name: string
+          stage?: string
+          updated_at?: string
+          value?: number | null
+        }
+        Update: {
+          close_date?: string | null
+          created_at?: string
+          id?: string
+          lead_id?: string | null
+          name?: string
+          stage?: string
+          updated_at?: string
+          value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deals_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_campaigns: {
         Row: {
           agent_notes: string | null
@@ -247,9 +321,11 @@ export type Database = {
         Row: {
           company: string | null
           created_at: string | null
+          deal_value: number | null
           email: string | null
           id: string
           industry: string | null
+          intent: string | null
           last_contacted_at: string | null
           last_reply_at: string | null
           lead_score: number | null
@@ -268,9 +344,11 @@ export type Database = {
         Insert: {
           company?: string | null
           created_at?: string | null
+          deal_value?: number | null
           email?: string | null
           id?: string
           industry?: string | null
+          intent?: string | null
           last_contacted_at?: string | null
           last_reply_at?: string | null
           lead_score?: number | null
@@ -289,9 +367,11 @@ export type Database = {
         Update: {
           company?: string | null
           created_at?: string | null
+          deal_value?: number | null
           email?: string | null
           id?: string
           industry?: string | null
+          intent?: string | null
           last_contacted_at?: string | null
           last_reply_at?: string | null
           lead_score?: number | null
