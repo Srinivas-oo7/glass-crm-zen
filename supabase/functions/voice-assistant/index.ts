@@ -62,6 +62,53 @@ serve(async (req) => {
     const lowerMessage = message.toLowerCase();
     let actionResults: string[] = [];
     let actionsTaken: any[] = [];
+    let uiActions: any[] = [];
+
+    // 0. UI Navigation Commands
+    // Open Settings
+    if (lowerMessage.includes("open settings") || lowerMessage.includes("show settings")) {
+      uiActions.push({ type: 'open_settings' });
+      actionResults.push("Opening settings");
+    }
+    
+    // Open Lead Generation
+    if ((lowerMessage.includes("find") || lowerMessage.includes("generate") || lowerMessage.includes("search")) && 
+        lowerMessage.includes("new lead")) {
+      uiActions.push({ type: 'open_lead_generation' });
+      actionResults.push("Opening lead generation");
+    }
+    
+    // Open Email Campaigns
+    if ((lowerMessage.includes("show") || lowerMessage.includes("open") || lowerMessage.includes("view")) && 
+        (lowerMessage.includes("email campaign") || lowerMessage.includes("all emails"))) {
+      uiActions.push({ type: 'open_emails' });
+      actionResults.push("Opening email campaigns");
+    }
+    
+    // Open Meeting Scheduler
+    if ((lowerMessage.includes("schedule") || lowerMessage.includes("book") || lowerMessage.includes("create")) && 
+        lowerMessage.includes("meeting") && !lowerMessage.includes("show")) {
+      uiActions.push({ type: 'open_meeting_scheduler' });
+      actionResults.push("Opening meeting scheduler");
+    }
+    
+    // Navigate to specific lead
+    if ((lowerMessage.includes("show") || lowerMessage.includes("open") || lowerMessage.includes("view")) && 
+        lowerMessage.includes("lead")) {
+      const leadName = message.match(/(?:show|open|view)\s+lead\s+(?:for\s+)?([A-Za-z\s]+)/i)?.[1]?.trim();
+      
+      if (leadName) {
+        const { data: leads } = await supabase.from("leads").select("*").ilike("name", `%${leadName}%`).limit(1);
+        const lead = leads?.[0];
+        
+        if (lead) {
+          uiActions.push({ type: 'navigate_to_lead', leadId: lead.id });
+          actionResults.push(`Opening details for ${lead.name}`);
+        } else {
+          actionResults.push(`Lead "${leadName}" not found`);
+        }
+      }
+    }
 
     // 1. Set follow-ups (check this FIRST before tasks/reminders)
     if (lowerMessage.includes("follow up") || lowerMessage.includes("followup")) {
@@ -783,9 +830,12 @@ ${actionResults.length > 0 ? `\n[ACTIONS COMPLETED: ${actionResults.join("; ")}]
 - Approving and sending emails
 - Creating and completing tasks
 - Managing meeting schedules
+- Opening different sections of the CRM
 - Providing actionable insights from the sales pipeline
 
 IMPORTANT CAPABILITIES:
+- You can OPEN settings, lead generation, email campaigns, and meeting scheduler
+- You can NAVIGATE to specific lead details pages
 - You can ADD tasks/reminders when asked
 - You can MARK tasks complete when requested
 - You can SET follow-ups with leads
@@ -801,6 +851,13 @@ IMPORTANT CAPABILITIES:
 - You can SHOW agent activity and status
 - You can SCHEDULE meetings with leads
 - You can PREPARE AI agent to join meetings (the AI will automatically join at the scheduled time)
+
+UI NAVIGATION COMMANDS:
+- "Open settings" - Opens the settings modal
+- "Find new leads" / "Generate leads" - Opens the lead generation modal
+- "Show email campaigns" / "View all emails" - Opens email campaigns view
+- "Schedule a meeting" / "Book a meeting" - Opens meeting scheduler
+- "Show lead for [Name]" / "Open lead [Name]" - Navigates to lead details page
 
 When actions are performed, you'll see [ACTIONS COMPLETED] in the context - acknowledge what was done.
 Always be proactive in suggesting and executing actions.
@@ -823,7 +880,10 @@ When reviewing emails, summarize sentiment and suggest approve/reject.`,
 
     console.log("Assistant response:", assistantMessage);
 
-    return new Response(JSON.stringify({ message: assistantMessage }), {
+    return new Response(JSON.stringify({ 
+      message: assistantMessage,
+      actions: uiActions 
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {

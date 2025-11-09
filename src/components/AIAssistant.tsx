@@ -17,7 +17,21 @@ interface HighlightedTile {
   name: string;
 }
 
-const AIAssistant = () => {
+interface AIAssistantProps {
+  onOpenSettings?: () => void;
+  onOpenLeadGen?: () => void;
+  onOpenEmails?: () => void;
+  onOpenMeeting?: () => void;
+  onNavigateToLead?: (leadId: string) => void;
+}
+
+const AIAssistant = ({ 
+  onOpenSettings, 
+  onOpenLeadGen, 
+  onOpenEmails, 
+  onOpenMeeting,
+  onNavigateToLead 
+}: AIAssistantProps) => {
   const [isActive, setIsActive] = useState(false);
   const [currentMessage, setCurrentMessage] = useState("");
   const [userQuery, setUserQuery] = useState("");
@@ -189,6 +203,31 @@ const AIAssistant = () => {
       });
 
       if (error) throw error;
+
+      // Handle UI actions from response
+      if (data.actions) {
+        for (const action of data.actions) {
+          switch (action.type) {
+            case 'open_settings':
+              onOpenSettings?.();
+              break;
+            case 'open_lead_generation':
+              onOpenLeadGen?.();
+              break;
+            case 'open_emails':
+              onOpenEmails?.();
+              break;
+            case 'open_meeting_scheduler':
+              onOpenMeeting?.();
+              break;
+            case 'navigate_to_lead':
+              if (action.leadId) {
+                onNavigateToLead?.(action.leadId);
+              }
+              break;
+          }
+        }
+      }
 
       // Add assistant message to history
       const assistantMessage: Message = { role: 'assistant', content: data.message };

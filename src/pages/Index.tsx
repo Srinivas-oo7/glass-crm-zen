@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import TopNav from "@/components/TopNav";
 import DashboardTile from "@/components/tiles/DashboardTile";
 import ContactsTile from "@/components/tiles/ContactsTile";
@@ -14,6 +15,7 @@ import EmailCampaignsView from "@/components/EmailCampaignsView";
 import MeetingScheduler from "@/components/MeetingScheduler";
 
 const Index = () => {
+  const navigate = useNavigate();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [leadGenOpen, setLeadGenOpen] = useState(false);
   const [emailsOpen, setEmailsOpen] = useState(false);
@@ -60,7 +62,13 @@ const Index = () => {
         </div>
       </main>
 
-      <AIAssistant />
+      <AIAssistant 
+        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenLeadGen={() => setLeadGenOpen(true)}
+        onOpenEmails={() => setEmailsOpen(true)}
+        onOpenMeeting={() => setMeetingOpen(true)}
+        onNavigateToLead={(leadId) => navigate(`/lead/${leadId}`)}
+      />
       <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
       <LeadGenerationModal open={leadGenOpen} onOpenChange={setLeadGenOpen} />
       <EmailCampaignsView open={emailsOpen} onOpenChange={setEmailsOpen} />
