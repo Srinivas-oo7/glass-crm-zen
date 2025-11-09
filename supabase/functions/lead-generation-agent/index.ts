@@ -123,7 +123,8 @@ Return ONLY valid JSON, no additional text.`
             const jsonStr = generatedText.substring(firstBrace, lastBrace + 1);
             try {
               const leadData = JSON.parse(jsonStr);
-              if (leadData.confidence >= 0.6) {
+              const conf = typeof leadData.confidence === 'number' ? leadData.confidence : 0.5;
+              if (conf >= 0.5) {
                 allLeads.push({
                   ...leadData,
                   source_url: result.url,

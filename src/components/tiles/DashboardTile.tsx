@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
-import { TrendingUp, Users, Calendar, DollarSign, Zap } from "lucide-react";
+import { TrendingUp, Users, Calendar, DollarSign, Zap, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { LeadSearchCustomizer } from "@/components/LeadSearchCustomizer";
 
 const DashboardTile = () => {
   const [stats, setStats] = useState({
@@ -13,6 +14,7 @@ const DashboardTile = () => {
     emailsSent: 0
   });
   const [loading, setLoading] = useState(false);
+  const [showCustomizer, setShowCustomizer] = useState(false);
 
   useEffect(() => {
     fetchStats();
@@ -62,16 +64,27 @@ const DashboardTile = () => {
     <div className="glass-tile gradient-dashboard p-4 hover-scale h-full flex flex-col">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-lg font-semibold">Dashboard</h2>
-        <Button 
-          onClick={handleFindLeads} 
-          disabled={loading}
-          variant="default"
-          size="sm"
-          className="gap-2"
-        >
-          <Zap className="h-4 w-4" />
-          {loading ? "Finding..." : "Find Leads"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            onClick={handleFindLeads} 
+            disabled={loading}
+            variant="default"
+            size="sm"
+            className="gap-2"
+          >
+            <Zap className="h-4 w-4" />
+            {loading ? "Finding..." : "Find Leads"}
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setShowCustomizer(true)}
+            title="Customize Lead Search"
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
       
       <div className="grid grid-cols-2 gap-3 mb-3">
@@ -129,6 +142,8 @@ const DashboardTile = () => {
           </div>
         </Card>
       </div>
+
+      <LeadSearchCustomizer open={showCustomizer} onOpenChange={setShowCustomizer} />
     </div>
   );
 };
