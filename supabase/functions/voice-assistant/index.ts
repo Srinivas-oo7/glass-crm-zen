@@ -54,8 +54,43 @@ serve(async (req) => {
     let actionResults: string[] = [];
     let actionsTaken: any[] = [];
     
-    // 1. Add tasks/reminders
-    if (lowerMessage.includes('remind') || lowerMessage.includes('add task') || lowerMessage.includes('todo')) {
+    // 1. Set follow-ups (check this FIRST before tasks/reminders)
+    if (lowerMessage.includes('follow up') || lowerMessage.includes('followup')) {
+      const leadName = message.match(/with\s+([A-Za-z\s]+?)(?:\s+on\s+|\s+tomorrow|\s+next|$)/i)?.[1]?.trim();
+      const dateMatch = message.match(/on\s+(\w+\s+\d+)/i)?.[1] || message.match(/(tomorrow|next\s+\w+)/i)?.[1];
+
+      if (leadName) {
+        const { data: lead } = await supabase
+          .from('leads')
+          .select('*')
+          .ilike('name', `%${leadName}%`)
+          .single();
+
+        if (lead) {
+          let followupDate;
+          if (dateMatch) {
+            if (dateMatch.toLowerCase() === 'tomorrow') {
+              followupDate = new Date();
+              followupDate.setDate(followupDate.getDate() + 1);
+              followupDate.setHours(9, 0, 0, 0);
+            } else if (dateMatch.toLowerCase().includes('next')) {
+              followupDate = new Date();
+              followupDate.setDate(followupDate.getDate() + 7);
+              followupDate.setHours(9, 0, 0, 0);
+            } else {
+              followupDate = new Date(dateMatch);
+            }
+          } else {
+            followupDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+          }
+
+          await supabase.from('leads').update({ next_followup_at: followupDate.toISOString() }).eq('id', lead.id);
+          actionResults.push(`Follow-up scheduled with ${lead.name}`);
+        }
+      }
+    }
+    // 2. Add tasks/reminders (but NOT if it's a follow-up)
+    else if (lowerMessage.includes('remind') || lowerMessage.includes('add task') || lowerMessage.includes('todo')) {
       const taskTitle = message.replace(/remind me to|add task to|create task to|todo:/gi, '').trim();
       if (taskTitle) {
         const today = new Date();
@@ -69,8 +104,8 @@ serve(async (req) => {
         if (!error) actionResults.push('Task added successfully');
       }
     }
-    
-    // 2. Mark tasks complete
+
+    // 3. Mark tasks complete
     if (lowerMessage.includes('complete') || lowerMessage.includes('done') || lowerMessage.includes('finish')) {
       if (lowerMessage.includes('task') || lowerMessage.includes('today')) {
         const { data: todayTasks } = await supabase
@@ -78,32 +113,12 @@ serve(async (req) => {
           .select('*')
           .gte('scheduled_at', new Date().toISOString().split('T')[0])
           .eq('status', 'scheduled');
-        
+
         if (todayTasks && todayTasks.length > 0) {
           for (const task of todayTasks) {
             await supabase.from('meetings').update({ status: 'completed' }).eq('id', task.id);
           }
           actionResults.push(`Marked ${todayTasks.length} task(s) as complete`);
-        }
-      }
-    }
-    
-    // 3. Set follow-ups
-    if (lowerMessage.includes('follow up') || lowerMessage.includes('followup')) {
-      const leadName = message.match(/with\s+([A-Za-z\s]+)/i)?.[1]?.trim();
-      const dateMatch = message.match(/on\s+(\w+\s+\d+)/i)?.[1];
-      
-      if (leadName) {
-        const { data: lead } = await supabase
-          .from('leads')
-          .select('*')
-          .ilike('name', `%${leadName}%`)
-          .single();
-        
-        if (lead) {
-          const followupDate = dateMatch ? new Date(dateMatch) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-          await supabase.from('leads').update({ next_followup_at: followupDate.toISOString() }).eq('id', lead.id);
-          actionResults.push(`Follow-up scheduled with ${lead.name}`);
         }
       }
     }
