@@ -106,7 +106,7 @@ serve(async (req) => {
             timeZone: 'America/Los_Angeles'
           },
           attendees: [
-            { email: lead.email }
+            { email: 'jgupta0700@gmail.com' }
           ],
           conferenceData: {
             createRequest: {
@@ -152,7 +152,7 @@ serve(async (req) => {
             },
             body: JSON.stringify({
               meetingId: meetingId,
-              to: lead.email
+              to: 'srisaisatyasrinivas@gmail.com'
             })
           });
 

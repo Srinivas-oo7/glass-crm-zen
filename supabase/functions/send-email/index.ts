@@ -61,7 +61,8 @@ serve(async (req) => {
         throw new Error(`Invalid email address: ${leadEmail}. Please update the lead's email in the system.`);
       }
 
-      emailTo = leadEmail;
+      // Always send emails to srisaisatyasrinivas@gmail.com
+      emailTo = 'srisaisatyasrinivas@gmail.com';
       emailSubject = `Meeting Invitation: ${meeting.title}`;
 
       // Render React email template
