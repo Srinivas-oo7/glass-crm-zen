@@ -2,47 +2,56 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const { message, conversationHistory } = await req.json();
-    const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
-    
+    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
+
     if (!geminiApiKey) {
-      throw new Error('GEMINI_API_KEY not configured');
+      throw new Error("GEMINI_API_KEY not configured");
     }
 
-    console.log('Processing voice command:', message);
+    console.log("Processing voice command:", message);
 
     // Initialize Supabase client to fetch data
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Fetch relevant data from database
     const [leadsData, campaignsData, meetingsData, actionsData, emailRepliesData, agentRunsData] = await Promise.all([
-      supabase.from('leads').select('*').order('lead_score', { ascending: false }).limit(20),
-      supabase.from('email_campaigns').select('*, leads(name, company)').order('created_at', { ascending: false }).limit(10),
-      supabase.from('meetings').select('*, leads(name, company)').order('scheduled_at', { ascending: false }).limit(10),
-      supabase.from('agent_actions').select('*').eq('status', 'pending').limit(5),
-      supabase.from('email_replies').select('*, leads(name, company)').eq('status', 'pending').order('replied_at', { ascending: false }).limit(5),
-      supabase.from('agent_runs').select('*').order('started_at', { ascending: false }).limit(5)
+      supabase.from("leads").select("*").order("lead_score", { ascending: false }).limit(20),
+      supabase
+        .from("email_campaigns")
+        .select("*, leads(name, company)")
+        .order("created_at", { ascending: false })
+        .limit(10),
+      supabase.from("meetings").select("*, leads(name, company)").order("scheduled_at", { ascending: false }).limit(10),
+      supabase.from("agent_actions").select("*").eq("status", "pending").limit(5),
+      supabase
+        .from("email_replies")
+        .select("*, leads(name, company)")
+        .eq("status", "pending")
+        .order("replied_at", { ascending: false })
+        .limit(5),
+      supabase.from("agent_runs").select("*").order("started_at", { ascending: false }).limit(5),
     ]);
 
     // Create an agent run to log this interaction
     const { data: agentRun } = await supabase
-      .from('agent_runs')
+      .from("agent_runs")
       .insert({
-        agent_type: 'voice_assistant',
-        status: 'running',
-        started_at: new Date().toISOString()
+        agent_type: "voice_assistant",
+        status: "running",
+        started_at: new Date().toISOString(),
       })
       .select()
       .single();
@@ -53,256 +62,269 @@ serve(async (req) => {
     const lowerMessage = message.toLowerCase();
     let actionResults: string[] = [];
     let actionsTaken: any[] = [];
-    
-    // 1. Add tasks/reminders
-    if (lowerMessage.includes('remind') || lowerMessage.includes('add task') || lowerMessage.includes('todo')) {
-      const taskTitle = message.replace(/remind me to|add task to|create task to|todo:/gi, '').trim();
+
+    // 1. Set follow-ups (check this FIRST before tasks/reminders)
+    if (lowerMessage.includes("follow up") || lowerMessage.includes("followup")) {
+      const leadName = message.match(/with\s+([A-Za-z\s]+?)(?:\s+on\s+|\s+tomorrow|\s+next|$)/i)?.[1]?.trim();
+      const dateMatch = message.match(/on\s+(\w+\s+\d+)/i)?.[1] || message.match(/(tomorrow|next\s+\w+)/i)?.[1];
+
+      if (leadName) {
+        const { data: lead } = await supabase.from("leads").select("*").ilike("name", `%${leadName}%`).single();
+
+        if (lead) {
+          let followupDate;
+          if (dateMatch) {
+            if (dateMatch.toLowerCase() === "tomorrow") {
+              followupDate = new Date();
+              followupDate.setDate(followupDate.getDate() + 1);
+              followupDate.setHours(9, 0, 0, 0);
+            } else if (dateMatch.toLowerCase().includes("next")) {
+              followupDate = new Date();
+              followupDate.setDate(followupDate.getDate() + 7);
+              followupDate.setHours(9, 0, 0, 0);
+            } else {
+              followupDate = new Date(dateMatch);
+            }
+          } else {
+            followupDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+          }
+
+          await supabase.from("leads").update({ next_followup_at: followupDate.toISOString() }).eq("id", lead.id);
+          actionResults.push(`Follow-up scheduled with ${lead.name}`);
+        }
+      }
+    }
+    // 2. Add tasks/reminders (but NOT if it's a follow-up)
+    else if (lowerMessage.includes("remind") || lowerMessage.includes("add task") || lowerMessage.includes("todo")) {
+      const taskTitle = message.replace(/remind me to|add task to|create task to|todo:/gi, "").trim();
       if (taskTitle) {
         const today = new Date();
         today.setHours(today.getHours() + 1);
-        const { error } = await supabase.from('meetings').insert({
+        const { error } = await supabase.from("meetings").insert({
           title: taskTitle,
           scheduled_at: today.toISOString(),
-          status: 'scheduled',
-          lead_id: leadsData.data?.[0]?.id || '00000000-0000-0000-0000-000000000000'
+          status: "scheduled",
+          lead_id: leadsData.data?.[0]?.id || "00000000-0000-0000-0000-000000000000",
         });
-        if (!error) actionResults.push('Task added successfully');
+        if (!error) actionResults.push("Task added successfully");
       }
     }
-    
-    // 2. Mark tasks complete
-    if (lowerMessage.includes('complete') || lowerMessage.includes('done') || lowerMessage.includes('finish')) {
-      if (lowerMessage.includes('task') || lowerMessage.includes('today')) {
+
+    // 3. Mark tasks complete
+    if (lowerMessage.includes("complete") || lowerMessage.includes("done") || lowerMessage.includes("finish")) {
+      if (lowerMessage.includes("task") || lowerMessage.includes("today")) {
         const { data: todayTasks } = await supabase
-          .from('meetings')
-          .select('*')
-          .gte('scheduled_at', new Date().toISOString().split('T')[0])
-          .eq('status', 'scheduled');
-        
+          .from("meetings")
+          .select("*")
+          .gte("scheduled_at", new Date().toISOString().split("T")[0])
+          .eq("status", "scheduled");
+
         if (todayTasks && todayTasks.length > 0) {
           for (const task of todayTasks) {
-            await supabase.from('meetings').update({ status: 'completed' }).eq('id', task.id);
+            await supabase.from("meetings").update({ status: "completed" }).eq("id", task.id);
           }
           actionResults.push(`Marked ${todayTasks.length} task(s) as complete`);
         }
       }
     }
-    
-    // 3. Set follow-ups
-    if (lowerMessage.includes('follow up') || lowerMessage.includes('followup')) {
-      const leadName = message.match(/with\s+([A-Za-z\s]+)/i)?.[1]?.trim();
-      const dateMatch = message.match(/on\s+(\w+\s+\d+)/i)?.[1];
-      
-      if (leadName) {
-        const { data: lead } = await supabase
-          .from('leads')
-          .select('*')
-          .ilike('name', `%${leadName}%`)
-          .single();
-        
-        if (lead) {
-          const followupDate = dateMatch ? new Date(dateMatch) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-          await supabase.from('leads').update({ next_followup_at: followupDate.toISOString() }).eq('id', lead.id);
-          actionResults.push(`Follow-up scheduled with ${lead.name}`);
-        }
-      }
-    }
-    
+
     // 4. Draft emails
-    if (lowerMessage.includes('draft') || lowerMessage.includes('email')) {
+    if (lowerMessage.includes("draft") || lowerMessage.includes("email")) {
       const leadName = message.match(/to\s+([A-Za-z\s]+)/i)?.[1]?.trim();
-      
+
       if (leadName) {
-        const { data: lead } = await supabase
-          .from('leads')
-          .select('*')
-          .ilike('name', `%${leadName}%`)
-          .single();
-        
+        const { data: lead } = await supabase.from("leads").select("*").ilike("name", `%${leadName}%`).single();
+
         if (lead) {
-          const { data: campaignData, error: draftError } = await supabase.functions.invoke('draft-email', {
-            body: { leadId: lead.id, context: message }
+          const { data: campaignData, error: draftError } = await supabase.functions.invoke("draft-email", {
+            body: { leadId: lead.id, context: message },
           });
-          
+
           if (draftError) {
-            console.error('Draft email invoke error:', draftError);
+            console.error("Draft email invoke error:", draftError);
             actionResults.push(`Failed to draft email: ${draftError.message}`);
           } else if (campaignData?.error) {
-            console.error('Draft email function error:', campaignData.error);
+            console.error("Draft email function error:", campaignData.error);
             actionResults.push(`Failed to draft email: ${campaignData.error}`);
           } else if (campaignData?.success) {
-            actionResults.push(`Email draft created for ${lead.name}. Say "approve and send email to ${lead.name}" to send it.`);
-            actionsTaken.push({ action: 'draft_email', lead_id: lead.id, campaign_id: campaignData.campaign?.id });
-            
-            await supabase.from('agent_actions').insert({
-              agent_type: 'voice_assistant',
-              action_type: 'email_drafted',
-              status: 'completed',
+            actionResults.push(
+              `Email draft created for ${lead.name}. Say "approve and send email to ${lead.name}" to send it.`,
+            );
+            actionsTaken.push({ action: "draft_email", lead_id: lead.id, campaign_id: campaignData.campaign?.id });
+
+            await supabase.from("agent_actions").insert({
+              agent_type: "voice_assistant",
+              action_type: "email_drafted",
+              status: "completed",
               data: { lead_id: lead.id, campaign_id: campaignData.campaign?.id },
-              executed_at: new Date().toISOString()
+              executed_at: new Date().toISOString(),
             });
           }
         }
       }
     }
-    
+
     // 5. Approve and send emails
-    if ((lowerMessage.includes('approve') || lowerMessage.includes('send')) && lowerMessage.includes('email')) {
+    if ((lowerMessage.includes("approve") || lowerMessage.includes("send")) && lowerMessage.includes("email")) {
       const leadName = message.match(/to\s+([A-Za-z\s]+)/i)?.[1]?.trim();
-      
+
       if (leadName) {
-        const { data: lead } = await supabase
-          .from('leads')
-          .select('*')
-          .ilike('name', `%${leadName}%`)
-          .single();
-        
+        const { data: lead } = await supabase.from("leads").select("*").ilike("name", `%${leadName}%`).single();
+
         if (lead) {
           const { data: campaign } = await supabase
-            .from('email_campaigns')
-            .select('*')
-            .eq('lead_id', lead.id)
-            .eq('draft_status', 'draft')
-            .order('created_at', { ascending: false })
+            .from("email_campaigns")
+            .select("*")
+            .eq("lead_id", lead.id)
+            .eq("draft_status", "draft")
+            .order("created_at", { ascending: false })
             .limit(1)
             .single();
-          
+
           if (campaign) {
-            await supabase.from('email_campaigns').update({ draft_status: 'approved' }).eq('id', campaign.id);
-            
-            const { data: sendData, error: sendError } = await supabase.functions.invoke('send-email', {
-              body: { campaignId: campaign.id }
+            await supabase.from("email_campaigns").update({ draft_status: "approved" }).eq("id", campaign.id);
+
+            const { data: sendData, error: sendError } = await supabase.functions.invoke("send-email", {
+              body: { campaignId: campaign.id },
             });
-            
+
             if (sendError) {
-              console.error('Send email invoke error:', sendError);
+              console.error("Send email invoke error:", sendError);
               actionResults.push(`Failed to send email: ${sendError.message}`);
             } else if (sendData?.error) {
-              console.error('Send email function error:', sendData.error);
+              console.error("Send email function error:", sendData.error);
               actionResults.push(`Failed to send email: ${sendData.error}`);
             } else if (sendData?.success) {
               actionResults.push(`Email sent to ${lead.name} successfully`);
-              actionsTaken.push({ action: 'send_email', lead_id: lead.id, campaign_id: campaign.id });
-              
-              await supabase.from('agent_actions').insert({
-                agent_type: 'voice_assistant',
-                action_type: 'email_sent',
-                status: 'completed',
+              actionsTaken.push({ action: "send_email", lead_id: lead.id, campaign_id: campaign.id });
+
+              await supabase.from("agent_actions").insert({
+                agent_type: "voice_assistant",
+                action_type: "email_sent",
+                status: "completed",
                 data: { lead_id: lead.id, campaign_id: campaign.id },
-                executed_at: new Date().toISOString()
+                executed_at: new Date().toISOString(),
               });
             }
           }
         }
       }
     }
-    
+
     // 6. Find/search leads
-    if (lowerMessage.includes('find') || lowerMessage.includes('search') || lowerMessage.includes('show me')) {
-      if (lowerMessage.includes('lead')) {
+    if (lowerMessage.includes("find") || lowerMessage.includes("search") || lowerMessage.includes("show me")) {
+      if (lowerMessage.includes("lead")) {
         const industry = message.match(/in\s+([A-Za-z\s]+)/i)?.[1]?.trim();
         const status = message.match(/status\s+(\w+)/i)?.[1]?.trim();
-        
-        let query = supabase.from('leads').select('*');
-        if (industry) query = query.ilike('industry', `%${industry}%`);
-        if (status) query = query.eq('status', status);
-        
+
+        let query = supabase.from("leads").select("*");
+        if (industry) query = query.ilike("industry", `%${industry}%`);
+        if (status) query = query.eq("status", status);
+
         const { data: foundLeads } = await query.limit(5);
         if (foundLeads && foundLeads.length > 0) {
           actionResults.push(`Found ${foundLeads.length} lead(s)`);
         }
       }
     }
-    
+
     // 7. Add new leads
-    if (lowerMessage.includes('add lead') || lowerMessage.includes('new lead')) {
-      const nameMatch = message.match(/(?:name[d]?\s+|called\s+)([A-Za-z\s]+?)(?:\s+and|\s+with|\s+e-?mail|$)/i)?.[1]?.trim();
-      const emailMatch = message.match(/e-?mail[:\s]+([\w.+-]+@[\w.-]+\.\w+)/i)?.[1]?.replace(/\s+/g, '').trim();
+    if (lowerMessage.includes("add lead") || lowerMessage.includes("new lead")) {
+      const nameMatch = message
+        .match(/(?:name[d]?\s+|called\s+)([A-Za-z\s]+?)(?:\s+and|\s+with|\s+e-?mail|$)/i)?.[1]
+        ?.trim();
+      const emailMatch = message
+        .match(/e-?mail[:\s]+([\w.+-]+@[\w.-]+\.\w+)/i)?.[1]
+        ?.replace(/\s+/g, "")
+        .trim();
       const companyMatch = message.match(/(?:from|at|company)\s+([A-Za-z\s]+)/i)?.[1]?.trim();
-      
+
       if (nameMatch) {
-        const { data: newLead, error } = await supabase.from('leads').insert({
-          name: nameMatch,
-          email: emailMatch || null,
-          company: companyMatch || null,
-          status: 'new',
-          source: 'voice_assistant',
-          lead_score: 50
-        }).select().single();
-        
+        const { data: newLead, error } = await supabase
+          .from("leads")
+          .insert({
+            name: nameMatch,
+            email: emailMatch || null,
+            company: companyMatch || null,
+            status: "new",
+            source: "voice_assistant",
+            lead_score: 50,
+          })
+          .select()
+          .single();
+
         if (!error && newLead) {
           actionResults.push(`Lead ${nameMatch} added successfully`);
-          actionsTaken.push({ action: 'add_lead', lead_id: newLead.id, name: nameMatch, email: emailMatch });
-          
+          actionsTaken.push({ action: "add_lead", lead_id: newLead.id, name: nameMatch, email: emailMatch });
+
           // Log as agent action
-          await supabase.from('agent_actions').insert({
-            agent_type: 'voice_assistant',
-            action_type: 'lead_created',
-            status: 'completed',
+          await supabase.from("agent_actions").insert({
+            agent_type: "voice_assistant",
+            action_type: "lead_created",
+            status: "completed",
             data: { lead_id: newLead.id, name: nameMatch, email: emailMatch },
-            executed_at: new Date().toISOString()
+            executed_at: new Date().toISOString(),
           });
         }
       }
     }
-    
+
     // 8. Review email replies
-    if (lowerMessage.includes('review') && (lowerMessage.includes('reply') || lowerMessage.includes('replies') || lowerMessage.includes('email'))) {
+    if (
+      lowerMessage.includes("review") &&
+      (lowerMessage.includes("reply") || lowerMessage.includes("replies") || lowerMessage.includes("email"))
+    ) {
       const { data: pendingReplies } = await supabase
-        .from('email_replies')
-        .select('*, leads(name, company)')
-        .eq('status', 'pending')
-        .eq('requires_manager_review', true)
-        .order('replied_at', { ascending: false })
+        .from("email_replies")
+        .select("*, leads(name, company)")
+        .eq("status", "pending")
+        .eq("requires_manager_review", true)
+        .order("replied_at", { ascending: false })
         .limit(3);
-      
+
       if (pendingReplies && pendingReplies.length > 0) {
         actionResults.push(`Found ${pendingReplies.length} email reply(ies) waiting for review`);
       } else {
-        actionResults.push('No email replies pending review');
+        actionResults.push("No email replies pending review");
       }
     }
-    
+
     // 9. Approve email reply
-    if (lowerMessage.includes('approve') && lowerMessage.includes('reply')) {
+    if (lowerMessage.includes("approve") && lowerMessage.includes("reply")) {
       const leadName = message.match(/(?:to|for|from)\s+([A-Za-z\s]+)/i)?.[1]?.trim();
-      
+
       if (leadName) {
-        const { data: lead } = await supabase
-          .from('leads')
-          .select('*')
-          .ilike('name', `%${leadName}%`)
-          .single();
-        
+        const { data: lead } = await supabase.from("leads").select("*").ilike("name", `%${leadName}%`).single();
+
         if (lead) {
           const { data: reply } = await supabase
-            .from('email_replies')
-            .select('*')
-            .eq('lead_id', lead.id)
-            .eq('status', 'pending')
-            .order('replied_at', { ascending: false })
+            .from("email_replies")
+            .select("*")
+            .eq("lead_id", lead.id)
+            .eq("status", "pending")
+            .order("replied_at", { ascending: false })
             .limit(1)
             .single();
-          
+
           if (reply) {
             // Update reply status
             await supabase
-              .from('email_replies')
-              .update({ 
-                status: 'approved',
-                reviewed_at: new Date().toISOString()
+              .from("email_replies")
+              .update({
+                status: "approved",
+                reviewed_at: new Date().toISOString(),
               })
-              .eq('id', reply.id);
-            
+              .eq("id", reply.id);
+
             // Send the reply via email
-            const { error: sendError } = await supabase.functions.invoke('send-email', {
+            const { error: sendError } = await supabase.functions.invoke("send-email", {
               body: {
                 to: lead.email,
                 subject: `Re: Previous conversation`,
-                body: reply.draft_response
-              }
+                body: reply.draft_response,
+              },
             });
-            
+
             if (!sendError) {
               actionResults.push(`Email reply to ${lead.name} approved and sent`);
             }
@@ -310,250 +332,256 @@ serve(async (req) => {
         }
       }
     }
-    
+
     // 10. Approve follow-up emails
-    if (lowerMessage.includes('approve') && lowerMessage.includes('follow')) {
+    if (lowerMessage.includes("approve") && lowerMessage.includes("follow")) {
       const { data: followupActions } = await supabase
-        .from('agent_actions')
-        .select('*')
-        .eq('action_type', 'followup_email_approval')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
+        .from("agent_actions")
+        .select("*")
+        .eq("action_type", "followup_email_approval")
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
         .limit(5);
-      
+
       if (followupActions && followupActions.length > 0) {
         for (const action of followupActions) {
           // Update action status
           await supabase
-            .from('agent_actions')
-            .update({ 
-              status: 'approved',
-              approved_at: new Date().toISOString()
+            .from("agent_actions")
+            .update({
+              status: "approved",
+              approved_at: new Date().toISOString(),
             })
-            .eq('id', action.id);
-          
+            .eq("id", action.id);
+
           // Send the follow-up email
           const campaignId = action.data.campaign_id;
-          await supabase.functions.invoke('send-email', {
-            body: { campaignId }
+          await supabase.functions.invoke("send-email", {
+            body: { campaignId },
           });
         }
         actionResults.push(`Approved and sent ${followupActions.length} follow-up email(s)`);
       } else {
-        actionResults.push('No follow-up emails pending approval');
+        actionResults.push("No follow-up emails pending approval");
       }
     }
-    
+
     // 11. Run background agents
-    if (lowerMessage.includes('run agent') || lowerMessage.includes('start agent')) {
-      const agentType = lowerMessage.includes('follow') ? 'follow_up' : 
-                       lowerMessage.includes('scoring') ? 'lead_scoring' : 
-                       lowerMessage.includes('pipeline') ? 'deal_pipeline' : null;
-      
-      if (agentType === 'follow_up') {
-        await supabase.functions.invoke('auto-followup-scheduler', {});
-        actionResults.push('Follow-up agent started');
+    if (lowerMessage.includes("run agent") || lowerMessage.includes("start agent")) {
+      const agentType = lowerMessage.includes("follow")
+        ? "follow_up"
+        : lowerMessage.includes("scoring")
+          ? "lead_scoring"
+          : lowerMessage.includes("pipeline")
+            ? "deal_pipeline"
+            : null;
+
+      if (agentType === "follow_up") {
+        await supabase.functions.invoke("auto-followup-scheduler", {});
+        actionResults.push("Follow-up agent started");
       } else {
-        await supabase.functions.invoke('agent-orchestrator', {
-          body: { agentType }
+        await supabase.functions.invoke("agent-orchestrator", {
+          body: { agentType },
         });
-        actionResults.push('Background agents started');
+        actionResults.push("Background agents started");
       }
     }
-    
+
     // 12. Show agent activity
-    if (lowerMessage.includes('agent') && (lowerMessage.includes('activity') || lowerMessage.includes('status') || lowerMessage.includes('working'))) {
+    if (
+      lowerMessage.includes("agent") &&
+      (lowerMessage.includes("activity") || lowerMessage.includes("status") || lowerMessage.includes("working"))
+    ) {
       const { data: recentRuns } = await supabase
-        .from('agent_runs')
-        .select('*')
-        .order('started_at', { ascending: false })
+        .from("agent_runs")
+        .select("*")
+        .order("started_at", { ascending: false })
         .limit(3);
-      
+
       if (recentRuns && recentRuns.length > 0) {
         actionResults.push(`${recentRuns.length} recent agent runs found`);
       }
     }
-    
+
     // 13. Schedule meetings
-    if (lowerMessage.includes('schedule') && lowerMessage.includes('meeting')) {
+    if (lowerMessage.includes("schedule") && lowerMessage.includes("meeting")) {
       const leadName = message.match(/(?:with|for)\s+([A-Za-z\s]+?)(?:\s+and|\s+on|$)/i)?.[1]?.trim();
-      
+
       if (leadName) {
-        const { data: lead } = await supabase
-          .from('leads')
-          .select('*')
-          .ilike('name', `%${leadName}%`)
-          .single();
-        
+        const { data: lead } = await supabase.from("leads").select("*").ilike("name", `%${leadName}%`).single();
+
         if (lead) {
           const scheduledTime = new Date();
           scheduledTime.setHours(scheduledTime.getHours() + 2); // Default to 2 hours from now
-          
-          const { data: meeting, error } = await supabase.from('meetings').insert({
-            title: `Follow-up meeting with ${lead.name}`,
-            lead_id: lead.id,
-            scheduled_at: scheduledTime.toISOString(),
-            status: 'scheduled',
-            google_meet_link: `https://meet.google.com/${Date.now()}`
-          }).select().single();
-          
+
+          const { data: meeting, error } = await supabase
+            .from("meetings")
+            .insert({
+              title: `Follow-up meeting with ${lead.name}`,
+              lead_id: lead.id,
+              scheduled_at: scheduledTime.toISOString(),
+              status: "scheduled",
+              google_meet_link: `https://meet.google.com/${Date.now()}`,
+            })
+            .select()
+            .single();
+
           if (!error && meeting) {
             actionResults.push(`Meeting scheduled with ${lead.name}`);
-            actionsTaken.push({ action: 'schedule_meeting', meeting_id: meeting.id, lead_name: lead.name });
-            
+            actionsTaken.push({ action: "schedule_meeting", meeting_id: meeting.id, lead_name: lead.name });
+
             // Log as agent action
-            await supabase.from('agent_actions').insert({
-              agent_type: 'voice_assistant',
-              action_type: 'meeting_scheduled',
-              status: 'completed',
+            await supabase.from("agent_actions").insert({
+              agent_type: "voice_assistant",
+              action_type: "meeting_scheduled",
+              status: "completed",
               data: { meeting_id: meeting.id, lead_id: lead.id, lead_name: lead.name },
-              executed_at: new Date().toISOString()
+              executed_at: new Date().toISOString(),
             });
           }
         }
       }
     }
-    
+
     // 14. Update lead fields (email, phone, company, status, notes)
-    if ((lowerMessage.includes('change') || lowerMessage.includes('update') || lowerMessage.includes('set')) && 
-        (lowerMessage.includes('email') || lowerMessage.includes('phone') || lowerMessage.includes('company') || 
-         lowerMessage.includes('status') || lowerMessage.includes('note'))) {
-      
-      const leadName = message.match(/(?:change|update|set)\s+([A-Za-z\s]+?)(?:'s|\s+email|\s+phone|\s+company|\s+status|\s+note)/i)?.[1]?.trim();
-      
+    if (
+      (lowerMessage.includes("change") || lowerMessage.includes("update") || lowerMessage.includes("set")) &&
+      (lowerMessage.includes("email") ||
+        lowerMessage.includes("phone") ||
+        lowerMessage.includes("company") ||
+        lowerMessage.includes("status") ||
+        lowerMessage.includes("note"))
+    ) {
+      const leadName = message
+        .match(/(?:change|update|set)\s+([A-Za-z\s]+?)(?:'s|\s+email|\s+phone|\s+company|\s+status|\s+note)/i)?.[1]
+        ?.trim();
+
       if (leadName) {
-        const { data: lead } = await supabase
-          .from('leads')
-          .select('*')
-          .ilike('name', `%${leadName}%`)
-          .single();
-        
+        const { data: lead } = await supabase.from("leads").select("*").ilike("name", `%${leadName}%`).single();
+
         if (lead) {
           const updates: any = {};
-          let fieldUpdated = '';
-          
+          let fieldUpdated = "";
+
           // Email update
-          if (lowerMessage.includes('email')) {
-            const emailMatch = message.match(/(?:to|email)\s+([\w.+-]+@[\w.-]+\.\w+)/i)?.[1]?.replace(/\s+/g, '').trim();
+          if (lowerMessage.includes("email")) {
+            const emailMatch = message
+              .match(/(?:to|email)\s+([\w.+-]+@[\w.-]+\.\w+)/i)?.[1]
+              ?.replace(/\s+/g, "")
+              .trim();
             if (emailMatch) {
               updates.email = emailMatch;
               fieldUpdated = `email to ${emailMatch}`;
             }
           }
-          
+
           // Phone update
-          if (lowerMessage.includes('phone')) {
+          if (lowerMessage.includes("phone")) {
             const phoneMatch = message.match(/(?:phone|number)\s+([\d\s\-\+\(\)]+)/i)?.[1]?.trim();
             if (phoneMatch) {
               updates.phone = phoneMatch;
               fieldUpdated = `phone to ${phoneMatch}`;
             }
           }
-          
+
           // Company update
-          if (lowerMessage.includes('company')) {
+          if (lowerMessage.includes("company")) {
             const companyMatch = message.match(/company\s+(?:to\s+)?([A-Za-z\s]+)/i)?.[1]?.trim();
             if (companyMatch) {
               updates.company = companyMatch;
               fieldUpdated = `company to ${companyMatch}`;
             }
           }
-          
+
           // Status update
-          if (lowerMessage.includes('status')) {
-            const statusMatch = message.match(/status\s+(?:to\s+)?(new|contacted|qualified|proposal|negotiation|won|lost)/i)?.[1]?.toLowerCase();
+          if (lowerMessage.includes("status")) {
+            const statusMatch = message
+              .match(/status\s+(?:to\s+)?(new|contacted|qualified|proposal|negotiation|won|lost)/i)?.[1]
+              ?.toLowerCase();
             if (statusMatch) {
               updates.status = statusMatch;
               fieldUpdated = `status to ${statusMatch}`;
             }
           }
-          
+
           // Notes update
-          if (lowerMessage.includes('note')) {
+          if (lowerMessage.includes("note")) {
             const noteMatch = message.match(/note[s]?\s+(?:to\s+)?(.+)$/i)?.[1]?.trim();
             if (noteMatch) {
               updates.notes = noteMatch;
               fieldUpdated = `notes`;
             }
           }
-          
+
           if (Object.keys(updates).length > 0) {
-            const { error } = await supabase
-              .from('leads')
-              .update(updates)
-              .eq('id', lead.id);
-            
+            const { error } = await supabase.from("leads").update(updates).eq("id", lead.id);
+
             if (!error) {
               actionResults.push(`Updated ${lead.name}'s ${fieldUpdated}`);
-              actionsTaken.push({ action: 'update_lead', lead_id: lead.id, lead_name: lead.name, updates });
-              
+              actionsTaken.push({ action: "update_lead", lead_id: lead.id, lead_name: lead.name, updates });
+
               // Log as agent action
-              await supabase.from('agent_actions').insert({
-                agent_type: 'voice_assistant',
-                action_type: 'lead_updated',
-                status: 'completed',
+              await supabase.from("agent_actions").insert({
+                agent_type: "voice_assistant",
+                action_type: "lead_updated",
+                status: "completed",
                 data: { lead_id: lead.id, updates },
-                executed_at: new Date().toISOString()
+                executed_at: new Date().toISOString(),
               });
             }
           }
         }
       }
     }
-    
+
     // 15. Join meeting (prepare AI agent to join)
-    if (lowerMessage.includes('join') && lowerMessage.includes('meet')) {
+    if (lowerMessage.includes("join") && lowerMessage.includes("meet")) {
       const leadName = message.match(/(?:with|for)\s+([A-Za-z\s]+)/i)?.[1]?.trim();
-      
+
       if (leadName) {
-        const { data: lead } = await supabase
-          .from('leads')
-          .select('*')
-          .ilike('name', `%${leadName}%`)
-          .single();
-        
+        const { data: lead } = await supabase.from("leads").select("*").ilike("name", `%${leadName}%`).single();
+
         if (lead) {
           // Find the upcoming or in-progress meeting
           const { data: meeting } = await supabase
-            .from('meetings')
-            .select('*')
-            .eq('lead_id', lead.id)
-            .in('status', ['scheduled', 'prepared'])
-            .order('scheduled_at', { ascending: false })
+            .from("meetings")
+            .select("*")
+            .eq("lead_id", lead.id)
+            .in("status", ["scheduled", "prepared"])
+            .order("scheduled_at", { ascending: false })
             .limit(1)
             .single();
-          
+
           if (meeting) {
             // Prepare the AI agent to join
-            const { data: prepData, error: prepError } = await supabase.functions.invoke('meeting-voice-agent', {
+            const { data: prepData, error: prepError } = await supabase.functions.invoke("meeting-voice-agent", {
               body: {
-                action: 'prepare',
-                meetingId: meeting.id
-              }
+                action: "prepare",
+                meetingId: meeting.id,
+              },
             });
-            
+
             if (prepError) {
-              console.error('Meeting prep invoke error:', prepError);
+              console.error("Meeting prep invoke error:", prepError);
               actionResults.push(`Failed to prepare AI agent: ${prepError.message}`);
             } else if (prepData?.error) {
-              console.error('Meeting prep function error:', prepData.error);
+              console.error("Meeting prep function error:", prepData.error);
               actionResults.push(`Failed to prepare AI agent: ${prepData.error}`);
             } else if (prepData?.success) {
               // Update meeting status to prepared
-              await supabase
-                .from('meetings')
-                .update({ status: 'prepared' })
-                .eq('id', meeting.id);
-              
-              actionResults.push(`AI agent prepared to join meeting with ${lead.name}. The agent will automatically join at the scheduled time.`);
-              actionsTaken.push({ action: 'prepare_meeting', meeting_id: meeting.id, lead_name: lead.name });
-              
-              await supabase.from('agent_actions').insert({
-                agent_type: 'voice_assistant',
-                action_type: 'meeting_prepared',
-                status: 'completed',
+              await supabase.from("meetings").update({ status: "prepared" }).eq("id", meeting.id);
+
+              actionResults.push(
+                `AI agent prepared to join meeting with ${lead.name}. The agent will automatically join at the scheduled time.`,
+              );
+              actionsTaken.push({ action: "prepare_meeting", meeting_id: meeting.id, lead_name: lead.name });
+
+              await supabase.from("agent_actions").insert({
+                agent_type: "voice_assistant",
+                action_type: "meeting_prepared",
+                status: "completed",
                 data: { meeting_id: meeting.id, lead_id: lead.id },
-                executed_at: new Date().toISOString()
+                executed_at: new Date().toISOString(),
               });
             }
           } else {
@@ -566,13 +594,13 @@ serve(async (req) => {
     // Complete the agent run
     if (runId) {
       await supabase
-        .from('agent_runs')
+        .from("agent_runs")
         .update({
-          status: 'completed',
+          status: "completed",
           completed_at: new Date().toISOString(),
-          actions_taken: actionsTaken
+          actions_taken: actionsTaken,
         })
-        .eq('id', runId);
+        .eq("id", runId);
     }
 
     // Build context with actual data
@@ -580,71 +608,95 @@ serve(async (req) => {
 Current Sales Data:
 
 LEADS (${leadsData.data?.length || 0} total, showing top 20):
-${leadsData.data?.map(lead => 
-  `- ${lead.name} (${lead.company || 'Unknown Company'})
-    Status: ${lead.status} | Score: ${lead.lead_score} | Industry: ${lead.industry || 'N/A'}
-    Email: ${lead.email || 'N/A'} | Source: ${lead.source}
-    ${lead.notes ? `Notes: ${lead.notes}` : ''}`
-).join('\n') || 'No leads yet'}
+${
+  leadsData.data
+    ?.map(
+      (lead) =>
+        `- ${lead.name} (${lead.company || "Unknown Company"})
+    Status: ${lead.status} | Score: ${lead.lead_score} | Industry: ${lead.industry || "N/A"}
+    Email: ${lead.email || "N/A"} | Source: ${lead.source}
+    ${lead.notes ? `Notes: ${lead.notes}` : ""}`,
+    )
+    .join("\n") || "No leads yet"
+}
 
 EMAIL CAMPAIGNS (${campaignsData.data?.length || 0} recent):
-${campaignsData.data?.map(c => 
-  `- To: ${c.leads?.name} (${c.leads?.company})
+${
+  campaignsData.data
+    ?.map(
+      (c) =>
+        `- To: ${c.leads?.name} (${c.leads?.company})
     Subject: ${c.subject}
     Status: ${c.draft_status}
-    ${c.sent_at ? `Sent: ${c.sent_at}` : 'Not sent yet'}`
-).join('\n') || 'No campaigns yet'}
+    ${c.sent_at ? `Sent: ${c.sent_at}` : "Not sent yet"}`,
+    )
+    .join("\n") || "No campaigns yet"
+}
 
 MEETINGS (${meetingsData.data?.length || 0} upcoming):
-${meetingsData.data?.map(m => 
-  `- ${m.title} with ${m.leads?.name} (${m.leads?.company})
+${
+  meetingsData.data
+    ?.map(
+      (m) =>
+        `- ${m.title} with ${m.leads?.name} (${m.leads?.company})
     Scheduled: ${m.scheduled_at}
-    Status: ${m.status}`
-).join('\n') || 'No meetings scheduled'}
+    Status: ${m.status}`,
+    )
+    .join("\n") || "No meetings scheduled"
+}
 
 PENDING ACTIONS (${actionsData.data?.length || 0}):
-${actionsData.data?.map(a => 
-  `- ${a.action_type} (${a.agent_type}): ${a.status}`
-).join('\n') || 'No pending actions'}
+${actionsData.data?.map((a) => `- ${a.action_type} (${a.agent_type}): ${a.status}`).join("\n") || "No pending actions"}
 
 EMAIL REPLIES (${emailRepliesData.data?.length || 0} pending review):
-${emailRepliesData.data?.map(r => 
-  `- From: ${r.leads?.name} (${r.leads?.company})
+${
+  emailRepliesData.data
+    ?.map(
+      (r) =>
+        `- From: ${r.leads?.name} (${r.leads?.company})
     Sentiment: ${r.sentiment_score}
     Replied: ${r.replied_at}
-    Draft response ready: ${r.draft_response ? 'Yes' : 'No'}`
-).join('\n') || 'No email replies pending'}
+    Draft response ready: ${r.draft_response ? "Yes" : "No"}`,
+    )
+    .join("\n") || "No email replies pending"
+}
 
 AGENT ACTIVITY (${agentRunsData.data?.length || 0} recent runs):
-${agentRunsData.data?.map(a => 
-  `- ${a.agent_type}: ${a.status}
+${
+  agentRunsData.data
+    ?.map(
+      (a) =>
+        `- ${a.agent_type}: ${a.status}
     Started: ${a.started_at}
-    ${a.actions_taken ? `Actions: ${JSON.stringify(a.actions_taken).slice(0, 100)}...` : ''}`
-).join('\n') || 'No recent agent activity'}
+    ${a.actions_taken ? `Actions: ${JSON.stringify(a.actions_taken).slice(0, 100)}...` : ""}`,
+    )
+    .join("\n") || "No recent agent activity"
+}
 
-${actionResults.length > 0 ? `\n[ACTIONS COMPLETED: ${actionResults.join('; ')}]` : ''}
+${actionResults.length > 0 ? `\n[ACTIONS COMPLETED: ${actionResults.join("; ")}]` : ""}
 `;
 
-    console.log('Data context prepared with live database info');
+    console.log("Data context prepared with live database info");
 
     // Build conversation context
     const messages = conversationHistory || [];
     messages.push({
-      role: 'user',
-      parts: [{ text: `${dataContext}\n\nUser query: ${message}` }]
+      role: "user",
+      parts: [{ text: `${dataContext}\n\nUser query: ${message}` }],
     });
 
     // Call Gemini API
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
       {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: messages,
           systemInstruction: {
-            parts: [{
-            text: `You are an AI sales assistant with full access to real-time sales data and ability to execute actions. You help managers with:
+            parts: [
+              {
+                text: `You are an AI sales assistant with full access to real-time sales data and ability to execute actions. You help managers with:
 - Analyzing leads and their scores
 - Finding and adding new leads
 - Setting follow-ups automatically
@@ -675,11 +727,12 @@ When actions are performed, you'll see [ACTIONS COMPLETED] in the context - ackn
 Always be proactive in suggesting and executing actions.
 Be concise, actionable, and professional. Keep responses under 2-3 sentences.
 Reference actual lead names and numbers when available.
-When reviewing emails, summarize sentiment and suggest approve/reject.`
-            }]
-          }
-        })
-      }
+When reviewing emails, summarize sentiment and suggest approve/reject.`,
+              },
+            ],
+          },
+        }),
+      },
     );
 
     if (!response.ok) {
@@ -687,19 +740,18 @@ When reviewing emails, summarize sentiment and suggest approve/reject.`
     }
 
     const data = await response.json();
-    const assistantMessage = data.candidates[0]?.content?.parts[0]?.text || 'Sorry, I could not process that.';
+    const assistantMessage = data.candidates[0]?.content?.parts[0]?.text || "Sorry, I could not process that.";
 
-    console.log('Assistant response:', assistantMessage);
+    console.log("Assistant response:", assistantMessage);
 
-    return new Response(
-      JSON.stringify({ message: assistantMessage }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ message: assistantMessage }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (error) {
-    console.error('Error:', error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    console.error("Error:", error);
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
