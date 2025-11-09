@@ -66,8 +66,8 @@ const FollowUpsTile = () => {
       if (error) throw error;
       
       toast({
-        title: "Follow-up Emails Sent",
-        description: `Sent ${data.emailsSent} follow-up email(s) to jgupta0700@gmail.com`,
+        title: "Follow-up Drafts Created",
+        description: `Created ${data.draftsCreated} follow-up email draft(s) for review`,
       });
       
       // Refresh the follow-ups list
@@ -95,7 +95,7 @@ const FollowUpsTile = () => {
           className="h-8"
         >
           <Send className="h-3 w-3 mr-1" />
-          {isSending ? 'Sending...' : 'Send'}
+          {isSending ? 'Creating...' : 'Create Drafts'}
         </Button>
       </div>
       

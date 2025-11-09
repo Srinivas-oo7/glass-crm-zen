@@ -6,7 +6,7 @@ import DealsTile from "@/components/tiles/DealsTile";
 import FollowUpsTile from "@/components/tiles/FollowUpsTile";
 import CalendarTile from "@/components/tiles/CalendarTile";
 import TodaysTasksTile from "@/components/tiles/TodaysTasksTile";
-import AgentActivityTile from "@/components/tiles/AgentActivityTile";
+import EmailReviewTile from "@/components/tiles/EmailReviewTile";
 import AIAssistant from "@/components/AIAssistant";
 import SettingsModal from "@/components/SettingsModal";
 import LeadGenerationModal from "@/components/LeadGenerationModal";
@@ -54,8 +54,8 @@ const Index = () => {
             <CalendarTile />
           </div>
 
-          <div className="lg:col-span-2" data-tile-id="agent-activity">
-            <AgentActivityTile />
+          <div className="lg:col-span-2" data-tile-id="email-review">
+            <EmailReviewTile />
           </div>
         </div>
       </main>

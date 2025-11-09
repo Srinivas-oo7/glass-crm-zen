@@ -87,68 +87,50 @@ serve(async (req) => {
           throw new Error('Failed to parse email content');
         }
 
-        // Send email with Resend to hardcoded email
-        const emailResponse = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${resendApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: 'CRM Follow-up <onboarding@resend.dev>',
-            to: ['jgupta0700@gmail.com'], // Hardcoded email
-            subject: `[Follow-up] ${emailContent.subject} - ${lead.name}`,
-            html: `
-              <h2>Follow-up for: ${lead.name}</h2>
-              <p><strong>Company:</strong> ${lead.company || 'N/A'}</p>
-              <p><strong>Status:</strong> ${lead.status}</p>
-              <hr>
-              <h3>${emailContent.subject}</h3>
-              ${emailContent.body.replace(/\n/g, '<br>')}
-            `
-          })
-        });
-
-        if (!emailResponse.ok) {
-          const errorText = await emailResponse.text();
-          console.error('Resend API error:', errorText);
-          throw new Error(`Failed to send email: ${errorText}`);
-        }
-
-        const emailData = await emailResponse.json();
-        console.log('Email sent successfully:', emailData.id);
-
-        // Update lead - clear next_followup_at and update last_contacted_at
-        await supabase
-          .from('leads')
-          .update({
-            last_contacted_at: new Date().toISOString(),
-            next_followup_at: null,
-            status: lead.status === 'new' ? 'contacted' : lead.status
-          })
-          .eq('id', lead.id);
-
-        // Create email campaign record
-        await supabase
+        // Create email draft instead of sending
+        const { data: campaignData, error: campaignError } = await supabase
           .from('email_campaigns')
           .insert({
             lead_id: lead.id,
             subject: emailContent.subject,
             body: emailContent.body,
-            draft_status: 'sent',
-            sent_at: new Date().toISOString(),
+            draft_status: 'draft',
             is_automated_followup: true,
-            agent_notes: 'Automated follow-up email sent'
+            agent_notes: 'AI-generated follow-up email - requires approval'
+          })
+          .select()
+          .single();
+
+        if (campaignError) {
+          console.error('Error creating draft:', campaignError);
+          throw new Error(`Failed to create draft: ${campaignError.message}`);
+        }
+
+        // Create agent action for approval
+        await supabase
+          .from('agent_actions')
+          .insert({
+            agent_type: 'followup_agent',
+            action_type: 'email_draft',
+            status: 'pending',
+            requires_approval: true,
+            data: {
+              campaign_id: campaignData.id,
+              lead_id: lead.id,
+              lead_name: lead.name,
+              subject: emailContent.subject,
+              preview: emailContent.body.substring(0, 100)
+            }
           });
 
         emailsSent.push({
           lead_id: lead.id,
           lead_name: lead.name,
-          email_id: emailData.id,
+          campaign_id: campaignData.id,
           subject: emailContent.subject
         });
 
-        console.log(`Follow-up email sent for ${lead.name}`);
+        console.log(`Follow-up email draft created for ${lead.name}`);
 
       } catch (leadError) {
         console.error(`Error processing lead ${lead.id}:`, leadError);
@@ -160,7 +142,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({ 
       success: true,
       leadsProcessed: leadsNeedingFollowup?.length || 0,
-      emailsSent: emailsSent.length,
+      draftsCreated: emailsSent.length,
       details: emailsSent
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

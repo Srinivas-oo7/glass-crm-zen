@@ -198,8 +198,6 @@ serve(async (req) => {
             .single();
 
           if (campaign) {
-            await supabase.from("email_campaigns").update({ draft_status: "approved" }).eq("id", campaign.id);
-
             const { data: sendData, error: sendError } = await supabase.functions.invoke("send-email", {
               body: { campaignId: campaign.id },
             });
@@ -222,8 +220,65 @@ serve(async (req) => {
                 executed_at: new Date().toISOString(),
               });
             }
+          } else {
+            actionResults.push(`No draft email found for ${lead.name}`);
           }
         }
+      }
+    }
+
+    // 5b. Reject email drafts
+    if (lowerMessage.includes("reject") && lowerMessage.includes("email")) {
+      const leadName = message.match(/(?:to|for)\s+([A-Za-z\s]+)/i)?.[1]?.trim();
+
+      if (leadName) {
+        const { data: lead } = await supabase.from("leads").select("*").ilike("name", `%${leadName}%`).single();
+
+        if (lead) {
+          const { data: campaign } = await supabase
+            .from("email_campaigns")
+            .select("*")
+            .eq("lead_id", lead.id)
+            .eq("draft_status", "draft")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .single();
+
+          if (campaign) {
+            await supabase.from("email_campaigns").delete().eq("id", campaign.id);
+            
+            actionResults.push(`Email draft for ${lead.name} has been rejected and deleted`);
+            actionsTaken.push({ action: "reject_email", lead_id: lead.id, campaign_id: campaign.id });
+
+            await supabase.from("agent_actions").insert({
+              agent_type: "voice_assistant",
+              action_type: "email_rejected",
+              status: "completed",
+              data: { lead_id: lead.id, campaign_id: campaign.id },
+              executed_at: new Date().toISOString(),
+            });
+          } else {
+            actionResults.push(`No draft email found for ${lead.name}`);
+          }
+        }
+      }
+    }
+
+    // 5c. Show pending email drafts
+    if ((lowerMessage.includes("show") || lowerMessage.includes("list")) && 
+        (lowerMessage.includes("draft") || lowerMessage.includes("pending email"))) {
+      const { data: drafts } = await supabase
+        .from("email_campaigns")
+        .select("*, leads(name, company)")
+        .eq("draft_status", "draft")
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      if (drafts && drafts.length > 0) {
+        const draftList = drafts.map((d: any) => `${d.leads?.name} - ${d.subject}`).join(", ");
+        actionResults.push(`You have ${drafts.length} pending email draft(s): ${draftList}`);
+      } else {
+        actionResults.push("No pending email drafts");
       }
     }
 
