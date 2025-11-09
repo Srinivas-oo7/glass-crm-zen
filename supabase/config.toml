@@ -35,3 +35,12 @@ verify_jwt = false
 
 [functions.send-followup-emails]
 verify_jwt = false
+
+[functions.profile-discovery]
+verify_jwt = false
+
+[functions.lead-generation-agent]
+verify_jwt = false
+
+[functions.get-ai-summary]
+verify_jwt = false

@@ -28,15 +28,30 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Get company profile
-    const { data: profile } = await supabaseClient
+    // Get or create company profile
+    let { data: profile } = await supabaseClient
       .from('company_profile')
       .select('*')
       .limit(1)
       .single();
 
+    // If no profile exists, create a default one
     if (!profile) {
-      throw new Error('Company profile not found. Run profile discovery first.');
+      const defaultProfile = {
+        company: 'Your Company',
+        industry: 'Technology',
+        target_industries: ['SaaS', 'Technology', 'Startups'],
+        target_roles: ['Sales Manager', 'Head of Sales', 'VP Sales'],
+        keywords: ['CRM', 'sales automation', 'lead generation', 'pipeline management']
+      };
+      
+      const { data: newProfile } = await supabaseClient
+        .from('company_profile')
+        .insert(defaultProfile)
+        .select()
+        .single();
+      
+      profile = newProfile || defaultProfile;
     }
 
     console.log('Generating leads for profile:', profile.company);

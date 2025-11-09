@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
-import { TrendingUp, Users, Calendar, DollarSign } from "lucide-react";
+import { TrendingUp, Users, Calendar, DollarSign, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 const DashboardTile = () => {
   const [stats, setStats] = useState({
@@ -10,6 +12,7 @@ const DashboardTile = () => {
     upcomingFollowups: 0,
     emailsSent: 0
   });
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchStats();
@@ -31,6 +34,23 @@ const DashboardTile = () => {
     });
   };
 
+  const handleFindLeads = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('lead-generation-agent');
+
+      if (error) throw error;
+
+      toast.success(`Found ${data.leadsInserted || 0} new leads!`);
+      fetchStats(); // Refresh stats
+    } catch (error: any) {
+      console.error('Lead generation failed:', error);
+      toast.error(error.message || "Failed to generate leads");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const kpis = [
     { label: "Total Leads / Contacts", value: stats.totalLeads.toString(), icon: Users, color: "text-primary" },
     { label: "Active Deals", value: stats.activeDeals.toString(), icon: TrendingUp, color: "text-success" },
@@ -40,7 +60,19 @@ const DashboardTile = () => {
 
   return (
     <div className="glass-tile gradient-dashboard p-4 hover-scale h-full flex flex-col">
-      <h2 className="text-lg font-semibold mb-3">Dashboard</h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-semibold">Dashboard</h2>
+        <Button 
+          onClick={handleFindLeads} 
+          disabled={loading}
+          variant="default"
+          size="sm"
+          className="gap-2"
+        >
+          <Zap className="h-4 w-4" />
+          {loading ? "Finding..." : "Find Leads"}
+        </Button>
+      </div>
       
       <div className="grid grid-cols-2 gap-3 mb-3">
         {kpis.map((kpi) => (
