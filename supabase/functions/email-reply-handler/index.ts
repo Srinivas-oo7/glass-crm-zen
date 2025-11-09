@@ -125,6 +125,21 @@ serve(async (req) => {
 
     console.log('Email reply processed successfully');
 
+    // Trigger deal intelligence analysis
+    try {
+      await supabase.functions.invoke('deal-intelligence', {
+        body: {
+          action: 'analyze_email',
+          leadId: leadId,
+          emailContent: replyContent,
+        },
+      });
+      console.log('Deal intelligence analysis triggered');
+    } catch (dealError) {
+      console.error('Error triggering deal intelligence:', dealError);
+      // Don't fail the whole request if deal analysis fails
+    }
+
     return new Response(JSON.stringify({ 
       success: true, 
       emailReply,

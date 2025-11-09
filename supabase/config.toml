@@ -44,3 +44,9 @@ verify_jwt = false
 
 [functions.get-ai-summary]
 verify_jwt = false
+
+[functions.deal-intelligence]
+verify_jwt = false
+
+[functions.auto-deal-creator]
+verify_jwt = false

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, getDay, addMonths, subMonths } from "date-fns";
 
@@ -12,48 +13,90 @@ interface Meeting {
   lead_id: string;
 }
 
+interface DealEvent {
+  id: string;
+  name: string;
+  close_date: string;
+  stage: string;
+  value: number;
+}
+
 const CalendarTile = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [dealEvents, setDealEvents] = useState<DealEvent[]>([]);
   const [upcomingMeetings, setUpcomingMeetings] = useState<Meeting[]>([]);
+  const [upcomingDeals, setUpcomingDeals] = useState<DealEvent[]>([]);
 
   useEffect(() => {
-    fetchMeetings();
+    fetchData();
 
-    const channel = supabase
+    const meetingsChannel = supabase
       .channel('calendar-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'meetings' }, () => {
-        fetchMeetings();
+        fetchData();
+      })
+      .subscribe();
+
+    const dealsChannel = supabase
+      .channel('calendar-deals')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deals' }, () => {
+        fetchData();
       })
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(meetingsChannel);
+      supabase.removeChannel(dealsChannel);
     };
   }, [currentDate]);
 
-  const fetchMeetings = async () => {
+  const fetchData = async () => {
     const monthStart = startOfMonth(currentDate);
     const monthEnd = endOfMonth(currentDate);
 
-    const { data } = await supabase
+    // Fetch meetings
+    const { data: meetingsData } = await supabase
       .from('meetings')
       .select('*')
       .gte('scheduled_at', monthStart.toISOString())
       .lte('scheduled_at', monthEnd.toISOString())
       .order('scheduled_at', { ascending: true });
 
-    setMeetings(data || []);
+    setMeetings(meetingsData || []);
 
-    // Get next 2 upcoming meetings
-    const { data: upcoming } = await supabase
+    // Fetch deals with close dates
+    const { data: dealsData } = await supabase
+      .from('deals')
+      .select('id, name, close_date, stage, value')
+      .not('close_date', 'is', null)
+      .not('stage', 'in', '(closed_won,closed_lost)')
+      .gte('close_date', monthStart.toISOString())
+      .lte('close_date', monthEnd.toISOString());
+    
+    setDealEvents(dealsData || []);
+
+    // Get upcoming meetings (next 2)
+    const { data: upcomingMeet } = await supabase
       .from('meetings')
       .select('*')
       .gte('scheduled_at', new Date().toISOString())
       .order('scheduled_at', { ascending: true })
       .limit(2);
 
-    setUpcomingMeetings(upcoming || []);
+    setUpcomingMeetings(upcomingMeet || []);
+
+    // Get upcoming deals (next 2)
+    const { data: upcomingDeal } = await supabase
+      .from('deals')
+      .select('id, name, close_date, stage, value')
+      .not('close_date', 'is', null)
+      .not('stage', 'in', '(closed_won,closed_lost)')
+      .gte('close_date', new Date().toISOString())
+      .order('close_date', { ascending: true })
+      .limit(2);
+
+    setUpcomingDeals(upcomingDeal || []);
   };
 
   const monthStart = startOfMonth(currentDate);
@@ -67,6 +110,12 @@ const CalendarTile = () => {
   const hasMeeting = (date: Date) => {
     return meetings.some(meeting => 
       isSameDay(new Date(meeting.scheduled_at), date)
+    );
+  };
+
+  const hasDeal = (date: Date) => {
+    return dealEvents.some(deal => 
+      isSameDay(new Date(deal.close_date), date)
     );
   };
 
@@ -103,36 +152,54 @@ const CalendarTile = () => {
           {daysInMonth.map((date) => {
             const isToday = isSameDay(date, today);
             const hasMeetingOnDate = hasMeeting(date);
+            const hasDealOnDate = hasDeal(date);
             
             return (
               <button
                 key={date.toISOString()}
                 className={`
-                  aspect-square rounded-md flex items-center justify-center text-xs font-medium transition-all
+                  aspect-square rounded-md flex items-center justify-center text-xs font-medium transition-all relative
                   ${isToday ? "bg-primary text-primary-foreground" : ""}
-                  ${hasMeetingOnDate && !isToday ? "bg-primary/10 text-primary" : ""}
-                  ${!isToday && !hasMeetingOnDate ? "hover:bg-muted" : ""}
+                  ${(hasMeetingOnDate || hasDealOnDate) && !isToday ? "bg-primary/10 text-primary" : ""}
+                  ${!isToday && !hasMeetingOnDate && !hasDealOnDate ? "hover:bg-muted" : ""}
                 `}
               >
                 {format(date, 'd')}
+                {hasDealOnDate && (
+                  <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-orange-500" />
+                )}
               </button>
             );
           })}
         </div>
 
-        <div className="pt-3 border-t border-white/40">
+        <div className="pt-3 border-t border-white/40 overflow-y-auto custom-scrollbar">
           <h4 className="text-xs font-medium mb-2">Upcoming</h4>
           <div className="space-y-1.5">
-            {upcomingMeetings.length === 0 ? (
+            {upcomingMeetings.length === 0 && upcomingDeals.length === 0 ? (
               <p className="text-xs text-muted-foreground">No upcoming events</p>
-            ) : upcomingMeetings.map((meeting) => (
-              <div key={meeting.id} className="flex justify-between text-xs">
-                <span className="text-muted-foreground">
-                  {format(new Date(meeting.scheduled_at), 'MMM d')}
-                </span>
-                <span className="font-medium truncate ml-2">{meeting.title}</span>
-              </div>
-            ))}
+            ) : (
+              <>
+                {upcomingMeetings.map((meeting) => (
+                  <div key={meeting.id} className="flex justify-between text-xs items-center">
+                    <span className="text-muted-foreground">
+                      {format(new Date(meeting.scheduled_at), 'MMM d')}
+                    </span>
+                    <span className="font-medium truncate ml-2">{meeting.title}</span>
+                    <Badge variant="secondary" className="ml-1 text-[10px] h-4">Meet</Badge>
+                  </div>
+                ))}
+                {upcomingDeals.map((deal) => (
+                  <div key={deal.id} className="flex justify-between text-xs items-center">
+                    <span className="text-muted-foreground">
+                      {format(new Date(deal.close_date), 'MMM d')}
+                    </span>
+                    <span className="font-medium truncate ml-2">{deal.name}</span>
+                    <Badge variant="secondary" className="ml-1 text-[10px] h-4">Deal</Badge>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         </div>
       </Card>

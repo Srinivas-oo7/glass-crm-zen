@@ -1,30 +1,30 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Clock, AlertCircle, Send } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
 
-interface FollowUp {
+interface DealFollowUp {
   id: string;
-  name: string;
-  company: string | null;
-  next_followup_at: string | null;
-  notes: string | null;
+  deal_name: string;
+  contact: string;
+  company: string;
+  stage: string;
+  days_inactive: number;
+  priority: string;
 }
 
 const FollowUpsTile = () => {
-  const [followUps, setFollowUps] = useState<FollowUp[]>([]);
-  const [isSending, setIsSending] = useState(false);
-  const { toast } = useToast();
+  const [followUps, setFollowUps] = useState<DealFollowUp[]>([]);
 
   useEffect(() => {
-    fetchFollowUps();
-
+    fetchDealFollowUps();
+    
     const channel = supabase
-      .channel('followups-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => {
-        fetchFollowUps();
+      .channel('followup-deals')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'deals' }, () => {
+        fetchDealFollowUps();
       })
       .subscribe();
 
@@ -33,102 +33,104 @@ const FollowUpsTile = () => {
     };
   }, []);
 
-  const fetchFollowUps = async () => {
-    const { data } = await supabase
-      .from('leads')
-      .select('id, name, company, next_followup_at, notes')
-      .not('next_followup_at', 'is', null)
-      .order('next_followup_at', { ascending: true })
-      .limit(4);
+  const fetchDealFollowUps = async () => {
+    const { data: deals } = await supabase
+      .from('deals')
+      .select('*, leads!deals_associated_contact_id_fkey(name, company)')
+      .in('stage', ['proposal', 'negotiation'])
+      .order('last_activity_at', { ascending: true });
 
-    setFollowUps(data || []);
+    if (!deals) return;
+
+    const now = new Date();
+    const followUpsList: DealFollowUp[] = deals
+      .map(deal => {
+        const lastActivity = new Date(deal.last_activity_at);
+        const daysInactive = Math.floor((now.getTime() - lastActivity.getTime()) / (1000 * 60 * 60 * 24));
+        
+        return {
+          id: deal.id,
+          deal_name: deal.name,
+          contact: deal.leads?.name || 'Unknown',
+          company: deal.leads?.company || 'Unknown',
+          stage: deal.stage,
+          days_inactive: daysInactive,
+          priority: daysInactive > 7 ? 'high' : daysInactive > 3 ? 'medium' : 'low'
+        };
+      })
+      .filter(item => item.days_inactive > 2);
+
+    setFollowUps(followUpsList);
   };
 
-  const getUrgencyStyles = (date: string | null) => {
-    if (!date) return "";
-    const daysUntil = Math.ceil((new Date(date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-    if (daysUntil <= 1) return "border-l-4 border-destructive bg-destructive/5";
-    if (daysUntil <= 3) return "border-l-4 border-warning bg-warning/5";
-    return "border-l-4 border-success bg-success/5";
+  const handleComplete = async (id: string) => {
+    await supabase
+      .from('deals')
+      .update({ last_activity_at: new Date().toISOString() })
+      .eq('id', id);
+    fetchDealFollowUps();
   };
 
-  const isHighUrgency = (date: string | null) => {
-    if (!date) return false;
-    const daysUntil = Math.ceil((new Date(date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-    return daysUntil <= 1;
-  };
-
-  const handleSendFollowups = async () => {
-    setIsSending(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('send-followup-emails');
-      
-      if (error) throw error;
-      
-      toast({
-        title: "Follow-up Drafts Created",
-        description: `Created ${data.draftsCreated} follow-up email draft(s) for review`,
-      });
-      
-      // Refresh the follow-ups list
-      fetchFollowUps();
-    } catch (error) {
-      console.error('Error sending follow-ups:', error);
-      toast({
-        title: "Error",
-        description: "Failed to send follow-up emails",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSending(false);
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case "high":
+        return "bg-destructive text-destructive-foreground";
+      case "medium":
+        return "bg-warning/10 text-warning";
+      default:
+        return "bg-secondary text-secondary-foreground";
     }
   };
 
   return (
-    <div className="glass-tile gradient-followups p-4 hover-scale h-full flex flex-col min-h-[300px]">
-      <div className="flex items-center justify-between mb-3 flex-shrink-0">
-        <h2 className="text-lg font-semibold">Follow-ups</h2>
-        <Button 
-          size="sm" 
-          onClick={handleSendFollowups}
-          disabled={isSending || followUps.length === 0}
-          className="h-8"
-        >
-          <Send className="h-3 w-3 mr-1" />
-          {isSending ? 'Creating...' : 'Create Drafts'}
-        </Button>
-      </div>
+    <div className="glass-tile gradient-followups p-4 hover-scale h-full flex flex-col">
+      <h2 className="text-lg font-semibold mb-3">Deal Follow-ups</h2>
       
-      <div className="space-y-2 overflow-y-auto custom-scrollbar flex-1 min-h-0 pr-1">
+      <div className="space-y-3 overflow-auto custom-scrollbar flex-1">
         {followUps.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">No follow-ups scheduled</p>
-        ) : followUps.map((followUp) => (
-          <Card
-            key={followUp.id}
-            className={`p-3 bg-white/60 border-white/40 hover:bg-white/80 transition-all ${getUrgencyStyles(followUp.next_followup_at)}`}
-          >
-            <div className="flex justify-between items-start mb-1">
-              <h3 className="font-semibold text-sm">{followUp.name}</h3>
-              {isHighUrgency(followUp.next_followup_at) && (
-                <AlertCircle className="h-3 w-3 text-destructive" />
+          <p className="text-sm text-muted-foreground text-center py-4">
+            All caught up! 🎉
+          </p>
+        ) : (
+          followUps.map((followUp) => (
+            <Card
+              key={followUp.id}
+              className="p-4 bg-white/60 border-white/40 hover:bg-white/80 transition-all"
+            >
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h4 className="font-semibold text-sm">{followUp.contact}</h4>
+                    <Badge className={getPriorityColor(followUp.priority)}>
+                      {followUp.priority}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-1">
+                    {followUp.company}
+                  </p>
+                  <p className="text-xs">{followUp.deal_name}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Stage: {followUp.stage}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleComplete(followUp.id)}
+                  className="h-8 w-8 p-0"
+                  title="Mark as contacted"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                </Button>
+              </div>
+              {followUp.days_inactive > 0 && (
+                <Badge variant="destructive" className="text-xs">
+                  No activity for {followUp.days_inactive} days
+                </Badge>
               )}
-            </div>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1.5">
-              <Clock className="h-3 w-3" />
-              <span>
-                {followUp.next_followup_at 
-                  ? new Date(followUp.next_followup_at).toLocaleString()
-                  : 'Not scheduled'}
-              </span>
-            </div>
-            {followUp.notes && (
-              <p className="text-xs text-primary">{followUp.notes}</p>
-            )}
-            {followUp.company && (
-              <p className="text-xs text-muted-foreground">{followUp.company}</p>
-            )}
-          </Card>
-        ))}
+            </Card>
+          ))
+        )}
       </div>
     </div>
   );

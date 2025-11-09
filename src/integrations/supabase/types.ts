@@ -121,36 +121,55 @@ export type Database = {
       }
       deals: {
         Row: {
+          associated_contact_id: string | null
           close_date: string | null
           created_at: string
           id: string
+          last_activity_at: string | null
           lead_id: string | null
           name: string
+          probability: number | null
+          source: string | null
           stage: string
           updated_at: string
           value: number | null
         }
         Insert: {
+          associated_contact_id?: string | null
           close_date?: string | null
           created_at?: string
           id?: string
+          last_activity_at?: string | null
           lead_id?: string | null
           name: string
+          probability?: number | null
+          source?: string | null
           stage?: string
           updated_at?: string
           value?: number | null
         }
         Update: {
+          associated_contact_id?: string | null
           close_date?: string | null
           created_at?: string
           id?: string
+          last_activity_at?: string | null
           lead_id?: string | null
           name?: string
+          probability?: number | null
+          source?: string | null
           stage?: string
           updated_at?: string
           value?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "deals_associated_contact_id_fkey"
+            columns: ["associated_contact_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "deals_lead_id_fkey"
             columns: ["lead_id"]
