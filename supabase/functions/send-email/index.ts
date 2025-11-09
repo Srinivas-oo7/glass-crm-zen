@@ -48,22 +48,24 @@ serve(async (req) => {
         throw new Error('Lead email not found in campaign');
       }
 
-      emailTo = campaign.leads.email;
       emailSubject = campaign.subject;
       emailBody = campaign.body;
       leadId = campaign.lead_id;
 
-      console.log('Sending campaign email to:', emailTo);
+      console.log('Original recipient would be:', campaign.leads.email);
     } else {
       // Direct email sending
       if (!to || !subject || !body) {
         throw new Error('Missing required fields: to, subject, body');
       }
-      emailTo = to;
       emailSubject = subject;
       emailBody = body;
-      console.log('Sending direct email to:', emailTo);
+      console.log('Original recipient would be:', to);
     }
+
+    // Override recipient for testing - always send to your email
+    emailTo = 'srisaisatyasrinivas@gmail.com';
+    console.log('Sending test email to:', emailTo);
 
     // Send email with Resend
     const emailResponse = await fetch('https://api.resend.com/emails', {
