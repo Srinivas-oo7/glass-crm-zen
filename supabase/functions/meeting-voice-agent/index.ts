@@ -187,24 +187,21 @@ Then your verbal response.`,
             body: JSON.stringify({
               contents: [{
                 parts: [{
-                  text: `Analyze this sales meeting transcript and provide:
-1. Confidence score (0-1): How likely is deal closure?
-2. Sentiment: positive/neutral/negative
-3. Key concerns mentioned
-4. Recommended next actions
-5. Should manager be alerted? (yes/no and why)
+                  text: `Analyze this sales meeting transcript and provide a JSON response.
 
 Transcript:
-${transcript}
+${JSON.stringify(transcript)}
 
-Format response as JSON:
+Respond ONLY with valid JSON in this exact format (no other text):
 {
-  "confidence": 0.X,
-  "sentiment": "...",
-  "concerns": ["..."],
-  "nextActions": ["..."],
-  "alertManager": { "needed": true/false, "reason": "..." }
-}`
+  "confidence": 0.75,
+  "sentiment": "positive",
+  "concerns": ["budget", "timing"],
+  "nextActions": ["send proposal", "schedule followup"],
+  "alertManager": { "needed": false, "reason": "conversation going well" }
+}
+
+Your response:`
                 }]
               }]
             })
@@ -213,7 +210,38 @@ Format response as JSON:
 
         const data = await response.json();
         const analysisText = data.candidates[0]?.content?.parts[0]?.text || '{}';
-        const analysis = JSON.parse(analysisText.replace(/```json\n?|\n?```/g, ''));
+        
+        // Try to extract JSON from the response
+        let analysis;
+        try {
+          // Remove markdown code blocks if present
+          const cleanedText = analysisText.replace(/```json\n?|\n?```/g, '').trim();
+          
+          // Try to find JSON object in the text
+          const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            analysis = JSON.parse(jsonMatch[0]);
+          } else {
+            // Fallback to default analysis
+            analysis = {
+              confidence: 0.5,
+              sentiment: "neutral",
+              concerns: ["Unable to parse AI analysis"],
+              nextActions: ["Review transcript manually"],
+              alertManager: { needed: false, reason: "Parsing error" }
+            };
+          }
+        } catch (parseError) {
+          console.error('Error parsing analysis:', parseError);
+          // Fallback analysis
+          analysis = {
+            confidence: 0.5,
+            sentiment: "neutral",
+            concerns: ["AI response parsing failed"],
+            nextActions: ["Review manually"],
+            alertManager: { needed: false, reason: "Technical error" }
+          };
+        }
 
         // Update meeting with analysis
         await supabase
