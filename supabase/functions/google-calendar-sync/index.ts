@@ -12,7 +12,8 @@ serve(async (req) => {
   }
 
   try {
-    const { action, code, meetingId, accessToken } = await req.json();
+    const body = await req.json();
+    const { action, code, meetingId, accessToken, origin } = body;
     
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -27,7 +28,8 @@ serve(async (req) => {
 
     switch (action) {
       case 'get_auth_url': {
-        const redirectUri = `${supabaseUrl}/functions/v1/google-calendar-sync`;
+        // Use the frontend callback URL instead of the edge function URL
+        const redirectUri = `${origin}/auth/google/callback`;
         const scope = 'https://www.googleapis.com/auth/calendar';
         const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent`;
         
@@ -38,7 +40,7 @@ serve(async (req) => {
       }
 
       case 'exchange_code': {
-        const redirectUri = `${supabaseUrl}/functions/v1/google-calendar-sync`;
+        const redirectUri = `${origin}/auth/google/callback`;
         
         const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
           method: 'POST',

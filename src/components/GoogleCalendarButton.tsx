@@ -34,7 +34,7 @@ const GoogleCalendarButton = ({ meetingId, onSuccess }: GoogleCalendarButtonProp
     setIsLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('google-calendar-sync', {
-        body: { action: 'get_auth_url' }
+        body: { action: 'get_auth_url', origin: window.location.origin }
       });
 
       if (error) throw error;
@@ -57,7 +57,7 @@ const GoogleCalendarButton = ({ meetingId, onSuccess }: GoogleCalendarButtonProp
           popup?.close();
           
           const { data: tokenData, error: tokenError } = await supabase.functions.invoke('google-calendar-sync', {
-            body: { action: 'exchange_code', code: event.data.code }
+            body: { action: 'exchange_code', code: event.data.code, origin: window.location.origin }
           });
 
           if (tokenError) throw tokenError;
