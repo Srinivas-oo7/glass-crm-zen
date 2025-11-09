@@ -221,11 +221,11 @@ const AIAssistant = () => {
         setIsActive(false);
         console.log('Overlay hidden, showing highlighted tile');
         
-        // After 5 seconds of showing the tile, bring overlay back
+        // After 5 seconds of showing the tile, bring overlay back with conversation history
         setTimeout(() => {
           setIsActive(true);
-          setUserQuery("");
-          setCurrentMessage("");
+          setUserQuery(""); // Clear current query for next input
+          setCurrentMessage(""); // Clear current message but keep history
           console.log('Overlay back, ready for next command');
           
           // Restart query recognition for follow-up
@@ -290,17 +290,45 @@ const AIAssistant = () => {
       {isActive && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
           <div className="absolute inset-0 flex items-center justify-center p-8">
-            <div className="max-w-4xl w-full space-y-6">
-              {/* User Query Display */}
-              {userQuery && (
+            <div className="max-w-4xl w-full space-y-6 max-h-screen overflow-y-auto">
+              {/* Conversation History */}
+              {conversationHistory.length > 0 && (
+                <div className="space-y-4">
+                  {conversationHistory.map((msg, idx) => (
+                    <div 
+                      key={idx}
+                      className={`glass-tile p-6 rounded-2xl animate-in slide-in-from-${msg.role === 'user' ? 'top' : 'bottom'} duration-300`}
+                    >
+                      {msg.role === 'user' ? (
+                        <>
+                          <p className="text-sm text-muted-foreground mb-2">You asked:</p>
+                          <p className="text-xl font-semibold">{msg.content}</p>
+                        </>
+                      ) : (
+                        <div className="flex items-start gap-4">
+                          <div className="shrink-0">
+                            <Mic className="h-6 w-6 text-primary" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-base leading-relaxed">{msg.content}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Current Query Being Processed */}
+              {userQuery && !conversationHistory.find(m => m.content === userQuery) && (
                 <div className="glass-tile p-6 rounded-2xl animate-in slide-in-from-top duration-300">
                   <p className="text-sm text-muted-foreground mb-2">You asked:</p>
                   <p className="text-2xl font-semibold">{userQuery}</p>
                 </div>
               )}
 
-              {/* AI Response Display */}
-              {currentMessage && (
+              {/* Current AI Response Being Generated */}
+              {currentMessage && !conversationHistory.find(m => m.content === currentMessage) && (
                 <div className="glass-tile gradient-ai p-8 rounded-2xl animate-in slide-in-from-bottom duration-500">
                   <div className="flex items-start gap-4">
                     <div className="shrink-0">
