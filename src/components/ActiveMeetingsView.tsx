@@ -4,8 +4,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Video, Bot, User, AlertTriangle, Loader2, ExternalLink } from "lucide-react";
+import { Video, Bot, User, AlertTriangle, Loader2, ExternalLink, Calendar } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
+import GeminiLiveVoice from "./GeminiLiveVoice";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface ActiveMeeting {
   id: string;
@@ -28,6 +37,7 @@ interface ActiveMeeting {
 const ActiveMeetingsView = () => {
   const [meetings, setMeetings] = useState<ActiveMeeting[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [activeLiveCall, setActiveLiveCall] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -85,6 +95,38 @@ const ActiveMeetingsView = () => {
       toast({
         title: "Error",
         description: "Failed to join meeting",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const syncWithGoogleCalendar = async (meetingId: string) => {
+    try {
+      toast({
+        title: "Syncing with Google Calendar",
+        description: "Creating calendar event...",
+      });
+
+      // First get auth URL
+      const { data: authData } = await supabase.functions.invoke('google-calendar-sync', {
+        body: { action: 'get_auth_url' }
+      });
+
+      if (authData?.authUrl) {
+        // Open Google auth in new window
+        const authWindow = window.open(authData.authUrl, '_blank', 'width=600,height=600');
+        
+        // In production, you'd handle the OAuth callback properly
+        toast({
+          title: "Authorize Google Calendar",
+          description: "Please authorize in the new window",
+        });
+      }
+    } catch (error) {
+      console.error('Error syncing calendar:', error);
+      toast({
+        title: "Error",
+        description: "Failed to sync with Google Calendar",
         variant: "destructive"
       });
     }
@@ -188,28 +230,70 @@ const ActiveMeetingsView = () => {
           )}
 
           {meeting.google_meet_link && (
-            <div className="mb-3">
+            <div className="mb-3 flex gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => window.open(meeting.google_meet_link!, '_blank')}
-                className="w-full"
+                className="flex-1"
               >
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Open Meeting Link
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => syncWithGoogleCalendar(meeting.id)}
+                className="flex-1"
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                Sync Calendar
               </Button>
             </div>
           )}
 
           {meeting.status === 'in_progress' && !meeting.manager_joined_at && (
-            <Button
-              size="sm"
-              onClick={() => handleJoinMeeting(meeting.id)}
-              className="w-full"
-            >
-              <Video className="h-4 w-4 mr-2" />
-              Join Meeting
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={() => handleJoinMeeting(meeting.id)}
+                className="flex-1"
+              >
+                <Video className="h-4 w-4 mr-2" />
+                Join Meeting
+              </Button>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="default"
+                    className="flex-1"
+                    onClick={() => setActiveLiveCall(meeting.id)}
+                  >
+                    <Bot className="h-4 w-4 mr-2" />
+                    Join Live Call
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Live Voice Call with {meeting.leads.name}</DialogTitle>
+                    <DialogDescription>
+                      Real-time voice conversation powered by Gemini Live
+                    </DialogDescription>
+                  </DialogHeader>
+                  {activeLiveCall === meeting.id && (
+                    <GeminiLiveVoice
+                      meetingId={meeting.id}
+                      leadName={meeting.leads.name}
+                      onCallEnd={() => {
+                        setActiveLiveCall(null);
+                        fetchActiveMeetings();
+                      }}
+                    />
+                  )}
+                </DialogContent>
+              </Dialog>
+            </div>
           )}
         </Card>
       ))}

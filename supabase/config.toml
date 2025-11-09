@@ -26,3 +26,9 @@ verify_jwt = false
 
 [functions.meeting-voice-agent]
 verify_jwt = false
+
+[functions.google-calendar-sync]
+verify_jwt = false
+
+[functions.gemini-live-session]
+verify_jwt = false
