@@ -1,5 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.47.10";
+import React from 'https://esm.sh/react@18.3.1';
+import { Resend } from 'https://esm.sh/resend@4.0.0';
+import { renderAsync } from 'https://esm.sh/@react-email/components@0.0.22';
+import { MeetingInviteEmail } from './_templates/meeting-invite.tsx';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,14 +16,16 @@ serve(async (req) => {
   }
 
   try {
-    const { campaignId, to, subject, body } = await req.json();
+    const { campaignId, to, subject, body, meetingId } = await req.json();
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
     
-    console.log('Send email function called with:', { campaignId, to, subject: subject ? 'provided' : 'from campaign' });
+    console.log('Send email function called with:', { campaignId, meetingId, to, subject: subject ? 'provided' : 'from campaign' });
     
     if (!resendApiKey) {
       throw new Error('RESEND_API_KEY not configured');
     }
+
+    const resend = new Resend(resendApiKey);
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -28,11 +34,44 @@ serve(async (req) => {
 
     let emailTo: string;
     let emailSubject: string;
-    let emailBody: string;
+    let emailHtml: string;
     let leadId: string | null = null;
 
-    // If campaignId is provided, use campaign data
-    if (campaignId) {
+    // Handle meeting invite emails
+    if (meetingId) {
+      const { data: meeting, error: meetingError } = await supabase
+        .from('meetings')
+        .select('*, leads(*)')
+        .eq('id', meetingId)
+        .single();
+
+      if (meetingError || !meeting) {
+        throw new Error(`Meeting not found: ${meetingError?.message}`);
+      }
+
+      const lead = meeting.leads;
+      if (!lead?.email) {
+        throw new Error('Lead email not found');
+      }
+
+      emailTo = to || lead.email;
+      emailSubject = `Meeting Invitation: ${meeting.title}`;
+
+      // Render React email template
+      emailHtml = await renderAsync(
+        React.createElement(MeetingInviteEmail, {
+          meetingTitle: meeting.title,
+          scheduledAt: meeting.scheduled_at,
+          googleMeetLink: meeting.google_meet_link,
+          leadName: lead.name,
+          leadCompany: lead.company,
+        })
+      );
+
+      console.log('Sending meeting invite to:', emailTo);
+    }
+    // Handle campaign emails
+    else if (campaignId) {
       const { data: campaign, error: campaignError } = await supabase
         .from('email_campaigns')
         .select('*, leads(*)')
@@ -45,47 +84,37 @@ serve(async (req) => {
       }
 
       emailSubject = campaign.subject;
-      emailBody = campaign.body;
+      emailHtml = campaign.body.replace(/\n/g, '<br>');
       leadId = campaign.lead_id;
+      emailTo = to || campaign.leads?.email || '';
 
-      console.log('Original recipient would be:', campaign.leads?.email || 'no email in database');
+      console.log('Sending campaign email to:', emailTo);
     } else {
       // Direct email sending
       if (!to || !subject || !body) {
         throw new Error('Missing required fields: to, subject, body');
       }
+      emailTo = to;
       emailSubject = subject;
-      emailBody = body;
-      console.log('Original recipient would be:', to);
+      emailHtml = body.replace(/\n/g, '<br>');
+      
+      console.log('Sending direct email to:', emailTo);
     }
-
-    // Override recipient for testing - always send to your email
-    emailTo = 'srisaisatyasrinivas@gmail.com';
-    console.log('Sending test email to:', emailTo);
 
     // Send email with Resend
-    const emailResponse = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${resendApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: 'CRM Assistant <onboarding@resend.dev>',
-        to: [emailTo],
-        subject: emailSubject,
-        html: emailBody.replace(/\n/g, '<br>')
-      })
+    const { error: sendError } = await resend.emails.send({
+      from: 'CRM Assistant <onboarding@resend.dev>',
+      to: [emailTo],
+      subject: emailSubject,
+      html: emailHtml,
     });
 
-    if (!emailResponse.ok) {
-      const errorText = await emailResponse.text();
-      console.error('Resend API error:', errorText);
-      throw new Error(`Failed to send email: ${errorText}`);
+    if (sendError) {
+      console.error('Resend API error:', sendError);
+      throw new Error(`Failed to send email: ${sendError.message}`);
     }
 
-    const emailData = await emailResponse.json();
-    console.log('Email sent successfully via Resend:', emailData.id);
+    console.log('Email sent successfully via Resend');
 
     // Update campaign status if this was a campaign email
     if (campaignId) {
@@ -125,7 +154,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ success: true, emailId: emailData.id }),
+      JSON.stringify({ success: true }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

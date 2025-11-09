@@ -142,6 +142,30 @@ serve(async (req) => {
           })
           .eq('id', meetingId);
 
+        // Send email invite automatically
+        try {
+          const emailResponse = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              meetingId: meetingId,
+              to: lead.email
+            })
+          });
+
+          if (emailResponse.ok) {
+            console.log('Meeting invite email sent successfully');
+          } else {
+            console.error('Failed to send meeting invite email:', await emailResponse.text());
+          }
+        } catch (emailError) {
+          console.error('Error sending meeting invite email:', emailError);
+          // Don't fail the whole request if email fails
+        }
+
         return new Response(
           JSON.stringify({ success: true, event: calendarEvent }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

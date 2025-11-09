@@ -60,20 +60,47 @@ const MeetingScheduler = ({ open, onOpenChange }: MeetingSchedulerProps) => {
 
     setIsLoading(true);
     try {
-      const { error } = await supabase.from('meetings').insert({
-        lead_id: selectedLeadId,
-        title: title.trim(),
-        scheduled_at: scheduledAt,
-        status: 'scheduled',
-        google_meet_link: `https://meet.google.com/new`
-      });
+      const { data: meeting, error } = await supabase
+        .from('meetings')
+        .insert({
+          lead_id: selectedLeadId,
+          title: title.trim(),
+          scheduled_at: scheduledAt,
+          status: 'scheduled',
+          google_meet_link: `https://meet.google.com/new`
+        })
+        .select('id')
+        .single();
 
       if (error) throw error;
 
-      toast({
-        title: "Success",
-        description: "Meeting scheduled successfully",
-      });
+      // Send email invite automatically
+      try {
+        const { error: emailError } = await supabase.functions.invoke('send-email', {
+          body: {
+            meetingId: meeting.id,
+          }
+        });
+
+        if (emailError) {
+          console.error('Failed to send email invite:', emailError);
+          toast({
+            title: "Meeting Scheduled",
+            description: "Meeting scheduled but failed to send email invite",
+          });
+        } else {
+          toast({
+            title: "Success",
+            description: "Meeting scheduled and email invite sent",
+          });
+        }
+      } catch (emailError) {
+        console.error('Error sending email invite:', emailError);
+        toast({
+          title: "Meeting Scheduled",
+          description: "Meeting scheduled but email invite may not have been sent",
+        });
+      }
 
       setTitle("");
       setScheduledAt("");
