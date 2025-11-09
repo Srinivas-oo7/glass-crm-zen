@@ -54,7 +54,14 @@ serve(async (req) => {
         throw new Error('Lead email not found');
       }
 
-      emailTo = to || lead.email;
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const leadEmail = to || lead.email;
+      if (!emailRegex.test(leadEmail)) {
+        throw new Error(`Invalid email address: ${leadEmail}. Please update the lead's email in the system.`);
+      }
+
+      emailTo = leadEmail;
       emailSubject = `Meeting Invitation: ${meeting.title}`;
 
       // Render React email template
