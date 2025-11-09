@@ -25,13 +25,12 @@ serve(async (req) => {
 
     console.log('Starting follow-up email sender...');
 
-    // Find leads that need follow-up (next_followup_at is today or in the past)
-    const now = new Date().toISOString();
+    // Find all leads with scheduled follow-ups
     const { data: leadsNeedingFollowup, error: leadsError } = await supabase
       .from('leads')
       .select('*')
       .not('next_followup_at', 'is', null)
-      .lte('next_followup_at', now)
+      .order('next_followup_at', { ascending: true })
       .limit(10);
 
     if (leadsError) throw leadsError;
