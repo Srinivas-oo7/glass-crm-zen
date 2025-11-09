@@ -89,8 +89,23 @@ serve(async (req) => {
             followupDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
           }
 
+          // Update lead's next_followup_at
           await supabase.from("leads").update({ next_followup_at: followupDate.toISOString() }).eq("id", lead.id);
+          
+          // Also create a meeting/task for the follow-up
+          await supabase.from("meetings").insert({
+            title: `Follow-up with ${lead.name}`,
+            scheduled_at: followupDate.toISOString(),
+            status: "scheduled",
+            lead_id: lead.id,
+          });
+          
           actionResults.push(`Follow-up scheduled with ${lead.name}`);
+          actionsTaken.push({
+            type: "schedule_followup",
+            lead_name: lead.name,
+            scheduled_at: followupDate.toISOString(),
+          });
         }
       }
     }
