@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
-import { Clock, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Clock, AlertCircle, Send } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface FollowUp {
   id: string;
@@ -13,6 +15,8 @@ interface FollowUp {
 
 const FollowUpsTile = () => {
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
+  const [isSending, setIsSending] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchFollowUps();
@@ -54,9 +58,46 @@ const FollowUpsTile = () => {
     return daysUntil <= 1;
   };
 
+  const handleSendFollowups = async () => {
+    setIsSending(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-followup-emails');
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Follow-up Emails Sent",
+        description: `Sent ${data.emailsSent} follow-up email(s) to jgupta0700@gmail.com`,
+      });
+      
+      // Refresh the follow-ups list
+      fetchFollowUps();
+    } catch (error) {
+      console.error('Error sending follow-ups:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send follow-up emails",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   return (
     <div className="glass-tile gradient-followups p-4 hover-scale h-full flex flex-col">
-      <h2 className="text-lg font-semibold mb-3">Follow-ups</h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-semibold">Follow-ups</h2>
+        <Button 
+          size="sm" 
+          onClick={handleSendFollowups}
+          disabled={isSending || followUps.length === 0}
+          className="h-8"
+        >
+          <Send className="h-3 w-3 mr-1" />
+          {isSending ? 'Sending...' : 'Send'}
+        </Button>
+      </div>
       
       <div className="space-y-2 overflow-auto custom-scrollbar flex-1">
         {followUps.length === 0 ? (

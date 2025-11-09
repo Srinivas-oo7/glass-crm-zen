@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.gemini-live-session]
 verify_jwt = false
+
+[functions.send-followup-emails]
+verify_jwt = false
