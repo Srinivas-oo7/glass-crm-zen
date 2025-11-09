@@ -16,16 +16,31 @@ interface Contact {
 const ContactsTile = () => {
   const navigate = useNavigate();
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     const fetchContacts = async () => {
-      const { data } = await supabase
+      // Fetch all leads to get count of unique names
+      const { data, count } = await supabase
         .from('leads')
-        .select('*')
-        .order('lead_score', { ascending: false })
-        .limit(5);
+        .select('*', { count: 'exact' })
+        .order('lead_score', { ascending: false });
       
-      if (data) setContacts(data);
+      if (data) {
+        // Filter for unique names (keep the one with highest lead_score)
+        const uniqueContacts = data.reduce((acc: Contact[], current) => {
+          const existingIndex = acc.findIndex(c => c.name.toLowerCase() === current.name.toLowerCase());
+          if (existingIndex === -1) {
+            acc.push(current);
+          } else if (current.lead_score > acc[existingIndex].lead_score) {
+            acc[existingIndex] = current;
+          }
+          return acc;
+        }, []);
+        
+        setContacts(uniqueContacts.slice(0, 5));
+        setTotalCount(uniqueContacts.length);
+      }
     };
 
     fetchContacts();
@@ -61,7 +76,14 @@ const ContactsTile = () => {
 
   return (
     <div className="glass-tile gradient-contacts p-4 hover-scale h-full flex flex-col">
-      <h2 className="text-lg font-semibold mb-3">Contacts</h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-semibold">Contacts</h2>
+        {totalCount > 0 && (
+          <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full font-medium">
+            {totalCount}
+          </span>
+        )}
+      </div>
       
       <div className="space-y-2 overflow-auto custom-scrollbar flex-1">
         {contacts.length === 0 ? (

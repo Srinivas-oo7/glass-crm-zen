@@ -33,6 +33,7 @@ const stages = [
 
 const DealsTile = () => {
   const [deals, setDeals] = useState<Deal[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [viewMode, setViewMode] = useState<ViewMode>('cards');
   const [newDealIds, setNewDealIds] = useState<Set<string>>(new Set());
 
@@ -67,12 +68,13 @@ const DealsTile = () => {
   }, []);
 
   const fetchDeals = async () => {
-    const { data } = await supabase
+    const { data, count } = await supabase
       .from('deals')
-      .select('*, leads!deals_associated_contact_id_fkey(company, name)')
+      .select('*, leads!deals_associated_contact_id_fkey(company, name)', { count: 'exact' })
       .order('value', { ascending: false });
 
     setDeals(data || []);
+    setTotalCount(count || 0);
   };
 
   const getStageColor = (stage: string) => {
@@ -193,7 +195,14 @@ const DealsTile = () => {
   return (
     <div className="glass-tile gradient-deals p-4 hover-scale h-full flex flex-col">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-semibold">Deals Pipeline</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold">Deals Pipeline</h2>
+          {totalCount > 0 && (
+            <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full font-medium">
+              {totalCount}
+            </span>
+          )}
+        </div>
         <div className="flex gap-1">
           <Button
             variant="ghost"

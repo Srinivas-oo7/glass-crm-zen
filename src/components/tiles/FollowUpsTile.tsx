@@ -15,6 +15,7 @@ interface FollowUp {
 
 const FollowUpsTile = () => {
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
 
   useEffect(() => {
     fetchFollowUps();
@@ -32,14 +33,14 @@ const FollowUpsTile = () => {
   }, []);
 
   const fetchFollowUps = async () => {
-    const { data } = await supabase
+    const { data, count } = await supabase
       .from('leads')
-      .select('id, name, company, next_followup_at, notes')
+      .select('id, name, company, next_followup_at, notes', { count: 'exact' })
       .not('next_followup_at', 'is', null)
-      .order('next_followup_at', { ascending: true })
-      .limit(4);
+      .order('next_followup_at', { ascending: true });
 
-    setFollowUps(data || []);
+    setFollowUps(data?.slice(0, 4) || []);
+    setTotalCount(count || 0);
   };
 
   const handleComplete = async (id: string) => {
@@ -86,7 +87,14 @@ const FollowUpsTile = () => {
 
   return (
     <div className="glass-tile gradient-followups p-4 hover-scale h-full flex flex-col">
-      <h2 className="text-lg font-semibold mb-3">Follow-ups</h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-semibold">Follow-ups</h2>
+        {totalCount > 0 && (
+          <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full font-medium">
+            {totalCount}
+          </span>
+        )}
+      </div>
       
       <div className="space-y-3 overflow-auto custom-scrollbar flex-1">
         {followUps.length === 0 ? (

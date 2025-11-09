@@ -28,6 +28,7 @@ interface EmailDraft {
 
 const EmailReviewTile = () => {
   const [drafts, setDrafts] = useState<EmailDraft[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [selectedDraft, setSelectedDraft] = useState<EmailDraft | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
@@ -48,14 +49,15 @@ const EmailReviewTile = () => {
   }, []);
 
   const fetchDrafts = async () => {
-    const { data } = await supabase
+    const { data, count } = await supabase
       .from('email_campaigns')
-      .select('*, leads(name, company, email)')
+      .select('*, leads(name, company, email)', { count: 'exact' })
       .eq('draft_status', 'draft')
       .order('created_at', { ascending: false })
       .limit(10);
 
     setDrafts(data || []);
+    setTotalCount(count || 0);
   };
 
   const handleApprove = async (draft: EmailDraft) => {
@@ -123,9 +125,9 @@ const EmailReviewTile = () => {
             <Mail className="h-5 w-5" />
             <h2 className="text-lg font-semibold">Emails for Review</h2>
           </div>
-          {drafts.length > 0 && (
-            <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full">
-              {drafts.length} pending
+          {totalCount > 0 && (
+            <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full font-medium">
+              {totalCount}
             </span>
           )}
         </div>
