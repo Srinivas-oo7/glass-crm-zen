@@ -85,8 +85,8 @@ const FollowUpsTile = () => {
   };
 
   return (
-    <div className="glass-tile gradient-followups p-4 hover-scale h-full flex flex-col">
-      <div className="flex items-center justify-between mb-3">
+    <div className="glass-tile gradient-followups p-4 hover-scale h-full flex flex-col min-h-[300px]">
+      <div className="flex items-center justify-between mb-3 flex-shrink-0">
         <h2 className="text-lg font-semibold">Follow-ups</h2>
         <Button 
           size="sm" 
@@ -99,7 +99,7 @@ const FollowUpsTile = () => {
         </Button>
       </div>
       
-      <div className="space-y-2 overflow-auto custom-scrollbar flex-1">
+      <div className="space-y-2 overflow-y-auto custom-scrollbar flex-1 min-h-0 pr-1">
         {followUps.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">No follow-ups scheduled</p>
         ) : followUps.map((followUp) => (
