@@ -144,9 +144,15 @@ serve(async (req) => {
       }
     }
 
-    // 4. Draft emails
-    if (lowerMessage.includes("draft") || lowerMessage.includes("email")) {
-      const leadName = message.match(/to\s+([A-Za-z\s]+)/i)?.[1]?.trim();
+    // 4. Draft emails - only trigger on draft/create/write email commands
+    if (
+      !lowerMessage.includes("approve") && 
+      !lowerMessage.includes("reject") && 
+      !lowerMessage.includes("send") &&
+      (lowerMessage.includes("draft") || lowerMessage.includes("write") || lowerMessage.includes("create")) && 
+      lowerMessage.includes("email")
+    ) {
+      const leadName = message.match(/(?:to|for)\s+([A-Za-z\s]+)/i)?.[1]?.trim();
 
       if (leadName) {
         const { data: lead } = await supabase.from("leads").select("*").ilike("name", `%${leadName}%`).single();
@@ -164,7 +170,7 @@ serve(async (req) => {
             actionResults.push(`Failed to draft email: ${campaignData.error}`);
           } else if (campaignData?.success) {
             actionResults.push(
-              `Email draft created for ${lead.name}. Say "approve and send email to ${lead.name}" to send it.`,
+              `Email draft created for ${lead.name}. Check the Emails for Review section to approve it.`,
             );
             actionsTaken.push({ action: "draft_email", lead_id: lead.id, campaign_id: campaignData.campaign?.id });
 
@@ -176,6 +182,8 @@ serve(async (req) => {
               executed_at: new Date().toISOString(),
             });
           }
+        } else {
+          actionResults.push(`Lead "${leadName}" not found`);
         }
       }
     }
