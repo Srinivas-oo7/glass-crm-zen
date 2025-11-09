@@ -69,7 +69,8 @@ serve(async (req) => {
       const dateMatch = message.match(/on\s+(\w+\s+\d+)/i)?.[1] || message.match(/(tomorrow|next\s+\w+)/i)?.[1];
 
       if (leadName) {
-        const { data: lead } = await supabase.from("leads").select("*").ilike("name", `%${leadName}%`).single();
+        const { data: leads } = await supabase.from("leads").select("*").ilike("name", `%${leadName}%`).limit(1);
+        const lead = leads?.[0];
 
         if (lead) {
           let followupDate;
