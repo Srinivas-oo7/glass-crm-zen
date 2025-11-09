@@ -110,12 +110,19 @@ Return ONLY valid JSON, no additional text.`
           );
 
           const geminiData = await geminiResponse.json();
-          const generatedText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+          let generatedText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
           
-          const jsonMatch = generatedText.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
+          // Remove markdown code blocks if present
+          generatedText = generatedText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+          
+          // Find the first { and last } to extract just the JSON object
+          const firstBrace = generatedText.indexOf('{');
+          const lastBrace = generatedText.lastIndexOf('}');
+          
+          if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+            const jsonStr = generatedText.substring(firstBrace, lastBrace + 1);
             try {
-              const leadData = JSON.parse(jsonMatch[0]);
+              const leadData = JSON.parse(jsonStr);
               if (leadData.confidence >= 0.6) {
                 allLeads.push({
                   ...leadData,
